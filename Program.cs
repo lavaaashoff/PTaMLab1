@@ -288,7 +288,8 @@ namespace TaMP
                         break;
 
                     case "Exit":
-                        Console.WriteLine("Exit program");
+                        fs.Close();
+                        Environment.Exit(0);
                         break;
                     default:
                         Console.WriteLine("Enter Help");
