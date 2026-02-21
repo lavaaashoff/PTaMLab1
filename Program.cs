@@ -108,12 +108,47 @@ namespace TaMP
 
             Console.WriteLine("Компонент добавлен");
         }
+        static public bool TryParseCreateCommand(string commandParams, out string filename, out short maxLength)
+        {
+            filename = null;
+            maxLength = 0;
 
+            if (!commandParams.Contains("(") || !commandParams.Contains(")"))
+            {
+                Console.WriteLine("Ошибка: Неверный формат команды");
+                return false;
+            }
 
+            filename = commandParams.Substring(0, commandParams.IndexOf("("));
+            if (string.IsNullOrWhiteSpace(filename))
+            {
+                Console.WriteLine("Ошибка: Имя файла не может быть пустым");
+                return false;
+            }
 
+            string lengthStr = commandParams.Substring(commandParams.IndexOf("(") + 1, commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1);
+            if (string.IsNullOrWhiteSpace(lengthStr))
+            {
+                Console.WriteLine("Ошибка: Длина записи не может быть пустой");
+                return false;
+            }
+            if (!short.TryParse(lengthStr, out maxLength))
+            {
+                Console.WriteLine("Ошибка: Длина записи должна быть числом");
+                return false;
+            }
+            if (maxLength <= 0)
+            {
+                Console.WriteLine("Ошибка: Длина записи должна быть положительным числом");
+                return false;
+            }
+
+            return true;
+        }
 
         static void Main(string[] args)
         {
+
             FileStream fs = null;
             while (true)
             {
@@ -126,16 +161,22 @@ namespace TaMP
                 {
                     commandParams += splittedCommand[i] + ' ';
                 }
-                string filename = string.Empty;
-                short maxLength;
                 switch (commandType)
                 {
                     case "Create":
-                        filename = commandParams.Substring(0, commandParams.IndexOf("("));
-                        maxLength = Convert.ToInt16(commandParams.Substring(commandParams.IndexOf("(") + 1, commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1));
-                        Console.WriteLine(filename);
-                        Console.WriteLine(maxLength);
-                        Create(filename, maxLength);
+                        if (TryParseCreateCommand(commandParams, out string filename, out short maxLength))
+                        {
+                            Console.WriteLine($"Имя файла: {filename}");
+                            Console.WriteLine($"Длина записи: {maxLength}");
+                            try
+                            {
+                                Create(filename, maxLength);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Ошибка при создании файла: {ex.Message}");
+                            }
+                        }
                         break;
 
                     case "Open":
