@@ -1,0 +1,14 @@
+C:\Users\lavaaash\source\repos\TaMP\bin\Debug\net10.0\TaMP.exe
+C:\Users\lavaaash\source\repos\TaMP\bin\Debug\net10.0\TaMP.deps.json
+C:\Users\lavaaash\source\repos\TaMP\bin\Debug\net10.0\TaMP.runtimeconfig.json
+C:\Users\lavaaash\source\repos\TaMP\bin\Debug\net10.0\TaMP.dll
+C:\Users\lavaaash\source\repos\TaMP\bin\Debug\net10.0\TaMP.pdb
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.AssemblyInfoInputs.cache
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.AssemblyInfo.cs
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.csproj.CoreCompileInputs.cache
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.dll
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\refint\TaMP.dll
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.pdb
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\TaMP.genruntimeconfig.cache
+C:\Users\lavaaash\source\repos\TaMP\obj\Debug\net10.0\ref\TaMP.dll
