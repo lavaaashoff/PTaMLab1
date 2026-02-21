@@ -54,9 +54,11 @@ namespace TaMP
 
         static public void Input(FileStream fs, string name, Form.Type type)
         {
-            fs.Seek(0, SeekOrigin.Begin);
+            fs.Seek(2, SeekOrigin.Begin);
             using BinaryReader reader = new(fs);
             using BinaryWriter writer = new(fs);
+
+
 
             short maxLength = reader.ReadInt16();
             int head = reader.ReadInt32();
