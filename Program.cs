@@ -7,10 +7,18 @@ namespace TaMP
     {
         static public void Create(string fileName, short maxLength)
         {
-            byte[] dataToWrite = { Convert.ToByte('P'), Convert.ToByte('S'), Convert.ToByte(maxLength), Convert.ToByte(new Element()), Convert.ToByte(new Element()) };
-            File.WriteAllBytes(fileName, dataToWrite);
-
-        
+            using (FileStream fs = new FileStream(fileName, FileMode.Create))
+            using (BinaryWriter writer = new BinaryWriter(fs))
+            {
+                writer.Write((byte)'P');
+                writer.Write((byte)'S');
+                writer.Write(maxLength);
+                writer.Write(-1);
+                writer.Write(-1);
+                int freeOffset = (int)fs.Position;
+                writer.Seek(freeOffset - 4, SeekOrigin.Begin);
+                writer.Write(freeOffset);
+            }
         }
 
         static public FileStream Open(string fileName)
@@ -41,23 +49,14 @@ namespace TaMP
             Console.WriteLine($"Длина записи данных: {maxLength}");
             Console.WriteLine($"Первая логическая запись: {head}");
             Console.WriteLine($"Свободная область: {tail}");
-
             return fs;
         }
 
         static public void Input(FileStream fs, string name, Form.Type type)
-        { 
+        {
+            fs.Seek(0, SeekOrigin.Begin);
             using BinaryReader reader = new(fs);
             using BinaryWriter writer = new(fs);
-
-            // Проверка сигнатуры
-            byte sign1 = reader.ReadByte();
-            byte sign2 = reader.ReadByte();
-            if (sign1 != (byte)'P' || sign2 != (byte)'S')
-            {
-                Console.WriteLine("Ошибка сигнатуры");
-                return;
-            }
 
             short maxLength = reader.ReadInt16();
             int head = reader.ReadInt32();
@@ -110,8 +109,10 @@ namespace TaMP
 
 
 
+
         static void Main(string[] args)
         {
+            FileStream fs = null;
             while (true)
             {
                 Console.Write("PS> ");
@@ -123,10 +124,8 @@ namespace TaMP
                 {
                     commandParams += splittedCommand[i] + ' ';
                 }
-
                 string filename = string.Empty;
                 short maxLength;
-
                 switch (commandType)
                 {
                     case "Create":
@@ -134,12 +133,12 @@ namespace TaMP
                         maxLength = Convert.ToInt16(commandParams.Substring(commandParams.IndexOf("(") + 1, commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1));
                         Console.WriteLine(filename);
                         Console.WriteLine(maxLength);
-                        //Create(filename, maxLength);
+                        Create(filename, maxLength);
                         break;
 
                     case "Open":
                         filename = commandParams;
-                        Console.WriteLine(filename);
+                        fs = Open(filename);
                         break;
 
                     case "Input":
@@ -169,6 +168,7 @@ namespace TaMP
 
                                 Console.WriteLine(componentName);
                                 Console.WriteLine(componentType);
+                                Input(fs, componentName, Form.Type.Product);
                             }
 
                             break;
