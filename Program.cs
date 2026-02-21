@@ -334,13 +334,9 @@ namespace TaMP
                         break;
 
                     case "Exit":
-                        Console.WriteLine("Завершение работы программы...");
-                        if (fs != null)
-                        {
-                            fs.Close();
-                        }
-                        return;
-
+                        fs.Close();
+                        Environment.Exit(0);
+                        break;
                     default:
                         Console.WriteLine("Неизвестная команда. Введите Help для получения списка команд.");
                         break;
