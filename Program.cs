@@ -33,9 +33,9 @@ namespace TaMP
 
             byte sign1 = reader.ReadByte();
             byte sign2 = reader.ReadByte();
-            if (sign1 != (byte)'P' || sign2 != (byte)'S')
+            if (sign1 != (byte)'P' || sign2 != (byte)'P')
             {
-                Console.WriteLine("Ошика: неправильная сигнатура файла");
+                Console.WriteLine("Ошибка: неправильная сигнатура файла");
                 reader.Close();
                 fs.Close();
                 return null;
@@ -57,8 +57,6 @@ namespace TaMP
             fs.Seek(2, SeekOrigin.Begin);
             using BinaryReader reader = new(fs);
             using BinaryWriter writer = new(fs);
-
-
 
             short maxLength = reader.ReadInt16();
             int head = reader.ReadInt32();
@@ -86,7 +84,6 @@ namespace TaMP
             writer.Write(buffer);
 
             // --- Обновление списка ---
-
             if (head == -1)
             {
                 // список пуст
@@ -108,6 +105,7 @@ namespace TaMP
 
             Console.WriteLine("Компонент добавлен");
         }
+
         static public bool TryParseCreateCommand(string commandParams, out string filename, out short maxLength)
         {
             filename = null;
@@ -146,9 +144,57 @@ namespace TaMP
             return true;
         }
 
+        static void DisplayHelpToConsole()
+        {
+            Console.WriteLine("\n=== Доступные команды ===");
+            Console.WriteLine("Create имя_файла(длина_записи) - создает новый файл");
+            Console.WriteLine("Open имя_файла - открывает существующий файл");
+            Console.WriteLine("Input(имя_компонента, тип) - добавляет компонент в открытый файл");
+            Console.WriteLine("Input(имя_компонента/имя_детали) - добавляет деталь в открытый файл");
+            Console.WriteLine("Delete(имя_компонента) - помечает компонент как удаленный");
+            Console.WriteLine("Delete(имя_компонента/имя_детали) - помечает деталь как удаленную");
+            Console.WriteLine("Restore(имя_компонента) - восстанавливает удаленный компонент");
+            Console.WriteLine("Restore * - восстанавливает все удаленные записи");
+            Console.WriteLine("Truncate - физически удаляет помеченные записи");
+            Console.WriteLine("Print(имя_компонента) - выводит информацию о компоненте");
+            Console.WriteLine("Print * - выводит информацию о всех записях");
+            Console.WriteLine("Help - выводит список команд");
+            Console.WriteLine("Help имя_файла - сохраняет список команд в файл");
+            Console.WriteLine("Exit - завершает работу программы");
+            Console.WriteLine("===========================\n");
+        }
+
+        static void SaveHelpToFile(string fileName)
+        {
+            try
+            {
+                using (StreamWriter writer = new StreamWriter(fileName))
+                {
+                    writer.WriteLine("=== Доступные команды ===");
+                    writer.WriteLine("Create имя_файла(длина_записи) - создает новый файл");
+                    writer.WriteLine("Open имя_файла - открывает существующий файл");
+                    writer.WriteLine("Input(имя_компонента, тип) - добавляет компонент в открытый файл");
+                    writer.WriteLine("Input(имя_компонента/имя_детали) - добавляет деталь в открытый файл");
+                    writer.WriteLine("Delete(имя_компонента) - помечает компонент как удаленный");
+                    writer.WriteLine("Delete(имя_компонента/имя_детали) - помечает деталь как удаленную");
+                    writer.WriteLine("Restore(имя_компонента) - восстанавливает удаленный компонент");
+                    writer.WriteLine("Restore * - восстанавливает все удаленные записи");
+                    writer.WriteLine("Truncate - физически удаляет помеченные записи");
+                    writer.WriteLine("Print(имя_компонента) - выводит информацию о компоненте");
+                    writer.WriteLine("Print * - выводит информацию о всех записях");
+                    writer.WriteLine("Help - выводит список команд");
+                    writer.WriteLine("Exit - завершает работу программы");
+                    writer.WriteLine("===========================");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при сохранении справки в файл: {ex.Message}");
+            }
+        }
+
         static void Main(string[] args)
         {
-
             FileStream fs = null;
             while (true)
             {
@@ -161,6 +207,8 @@ namespace TaMP
                 {
                     commandParams += splittedCommand[i] + ' ';
                 }
+                commandParams = commandParams.Trim();
+
                 switch (commandType)
                 {
                     case "Create":
@@ -213,7 +261,6 @@ namespace TaMP
                                 Console.WriteLine(componentType);
                                 Input(fs, componentName, Form.Type.Product);
                             }
-
                             break;
                         }
 
@@ -278,20 +325,24 @@ namespace TaMP
                     case "Help":
                         if (string.IsNullOrWhiteSpace(commandParams))
                         {
-                            Console.WriteLine("Help to console");
+                            DisplayHelpToConsole();
                         }
                         else
                         {
-                            string helpFile = commandParams;
-                            Console.WriteLine(helpFile);
+                            SaveHelpToFile(commandParams);
                         }
                         break;
 
                     case "Exit":
-                        Console.WriteLine("Exit program");
-                        break;
+                        Console.WriteLine("Завершение работы программы...");
+                        if (fs != null)
+                        {
+                            fs.Close();
+                        }
+                        return;
+
                     default:
-                        Console.WriteLine("Enter Help");
+                        Console.WriteLine("Неизвестная команда. Введите Help для получения списка команд.");
                         break;
                 }
             }
