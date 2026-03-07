@@ -12,9 +12,9 @@ using System;
 using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("TaMP")]
-[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+178f80633efe342ab01f6ba0e8c7f9eb5dd4c02f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fad908d5c0ffbbd215f5553435b87096d7b1832c")]
 [assembly: System.Reflection.AssemblyProductAttribute("TaMP")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TaMP")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
