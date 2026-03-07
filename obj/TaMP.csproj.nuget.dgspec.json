@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\user\\MyVR\\PTaMLab1\\TaMP.csproj": {}
+    "C:\\Users\\lavaaash\\source\\repos\\TaMP\\TaMP.csproj": {}
   },
   "projects": {
-    "C:\\Users\\user\\MyVR\\PTaMLab1\\TaMP.csproj": {
+    "C:\\Users\\lavaaash\\source\\repos\\TaMP\\TaMP.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\user\\MyVR\\PTaMLab1\\TaMP.csproj",
+        "projectUniqueName": "C:\\Users\\lavaaash\\source\\repos\\TaMP\\TaMP.csproj",
         "projectName": "TaMP",
-        "projectPath": "C:\\Users\\user\\MyVR\\PTaMLab1\\TaMP.csproj",
-        "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\user\\MyVR\\PTaMLab1\\obj\\",
+        "projectPath": "C:\\Users\\lavaaash\\source\\repos\\TaMP\\TaMP.csproj",
+        "packagesPath": "C:\\Users\\lavaaash\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\lavaaash\\source\\repos\\TaMP\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\lavaaash\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -65,7 +65,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.101/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.103/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

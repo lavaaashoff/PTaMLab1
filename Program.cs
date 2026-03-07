@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Microsoft.VisualBasic.FileIO;
+using System;
 using System.IO;
+using System.Reflection.PortableExecutable;
 
 namespace PSConsole
 {
@@ -26,267 +28,59 @@ namespace PSConsole
             while (true)
             {
                 Console.Write("PS> ");
-                var input = Console.ReadLine();
-                if (string.IsNullOrWhiteSpace(input)) continue;
+                var cmd = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(cmd)) continue;
 
-                var parts = input.Split(' ', 2);
+                var parts = cmd.Split(' ', 2);
                 var command = parts[0];
-                var commandParams = parts.Length > 1 ? parts[1] : "";
+                var args = parts.Length > 1 ? parts[1] : "";
 
-                try
+                switch (command)
                 {
-                    switch (command)
-                    {
-                        case "Create":
-                            if (TryParseCreateCommand(commandParams, out string filename, out short maxLength))
-                            {
-                                Console.WriteLine($"Имя файла: {filename}");
-                                Console.WriteLine($"Длина записи: {maxLength}");
-                                Create(filename, maxLength);
-                                Console.WriteLine("Файл успешно создан.");
-                            }
-                            else
-                            {
-                                throw new Exception("Неверный формат. Используйте: Create <имя_файла> <длина_записи>");
-                            }
-                            break;
+                    case "Create":
+                        Create(args);
+                        break;
+                    case "Open":
+                        Open(args);
+                        break;
+                    case "Input":
+                        Input(args);
+                        break;
+                    case "Delete":
+                        Delete(args);
+                        break;
 
-                        case "Open":
-                            if (string.IsNullOrWhiteSpace(commandParams))
-                                throw new Exception("Укажите имя файла.");
-
-                            filename = commandParams;
-                            Open(filename);
-                            break;
-
-                        case "Input":
-                            if (string.IsNullOrWhiteSpace(commandParams))
-                                throw new Exception("Нет параметров.");
-
-                            if (!commandParams.Contains("(") || !commandParams.Contains(")"))
-                                throw new Exception("Неверный формат. Используйте: Input(компонент, тип) или Input(компонент/деталь)");
-
-                            if (commandParams.Contains("/"))
-                            {
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf("/") - commandParams.IndexOf("(") - 1);
-
-                                string detailName = commandParams.Substring(
-                                    commandParams.IndexOf("/") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf("/") - 1);
-
-                                if (string.IsNullOrWhiteSpace(componentName) || string.IsNullOrWhiteSpace(detailName))
-                                    throw new Exception("Имена не могут быть пустыми.");
-
-                                Console.WriteLine($"Компонент: {componentName}");
-                                Console.WriteLine($"Деталь: {detailName}");
-
-                                // Вызов метода для добавления спецификации
-                                InputSpec($"{componentName}/{detailName}");
-                            }
-                            else
-                            {
-                                if (!commandParams.Contains(","))
-                                    throw new Exception("Нужна запятая. Используйте: Input(компонент, тип)");
-
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf(",") - commandParams.IndexOf("(") - 1).Trim();
-
-                                string componentType = commandParams.Substring(
-                                    commandParams.IndexOf(",") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf(",") - 1).Trim();
-
-                                if (string.IsNullOrWhiteSpace(componentName))
-                                    throw new Exception("Имя компонента не может быть пустым.");
-
-                                Console.WriteLine($"Компонент: {componentName}");
-                                Console.WriteLine($"Тип: {componentType}");
-
-                                if (compFs == null)
-                                    throw new Exception("Сначала откройте файл (Open).");
-
-                                if (Enum.TryParse<ComponentType>(componentType, true, out ComponentType type))
-                                {
-                                    Input(componentName, type);
-                                    Console.WriteLine("Компонент добавлен.");
-                                }
-                                else
-                                {
-                                    throw new Exception($"Неверный тип компонента. Допустимые значения: Product, Unit, Detail");
-                                }
-                            }
-                            break;
-
-                        case "Delete":
-                            if (string.IsNullOrWhiteSpace(commandParams))
-                                throw new Exception("Нет параметров.");
-
-                            if (!commandParams.Contains("(") || !commandParams.Contains(")"))
-                                throw new Exception("Неверный формат. Используйте: Delete(компонент) или Delete(компонент/деталь)");
-
-                            if (commandParams.Contains("/"))
-                            {
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf("/") - commandParams.IndexOf("(") - 1);
-
-                                string detailName = commandParams.Substring(
-                                    commandParams.IndexOf("/") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf("/") - 1);
-
-                                Console.WriteLine($"Удалить компонент: {componentName}");
-                                Console.WriteLine($"Удалить деталь: {detailName}");
-                                // Здесь можно добавить логику удаления спецификации
-                            }
-                            else
-                            {
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1).Trim();
-
-                                Console.WriteLine($"Удалить компонент: {componentName}");
-                                Delete(componentName);
-                            }
-                            break;
-
-                        case "Restore":
-                            if (commandParams.Contains("*"))
-                            {
-                                Console.WriteLine("Восстановить всё");
-                                RestoreAll();
-                            }
-                            else
-                            {
-                                if (!commandParams.Contains("(") || !commandParams.Contains(")"))
-                                    throw new Exception("Используйте: Restore(*) или Restore(компонент)");
-
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1).Trim();
-
-                                Console.WriteLine($"Восстановить: {componentName}");
-                                Restore(componentName);
-                            }
-                            break;
-
-                        case "Truncate":
-                            Console.WriteLine("Очистка...");
-                            Truncate();
-                            break;
-
-                        case "Print":
-                            if (commandParams.Contains("*"))
-                            {
-                                Console.WriteLine("Печать всего");
-                                Print("*");
-                            }
-                            else
-                            {
-                                if (!commandParams.Contains("(") || !commandParams.Contains(")"))
-                                    throw new Exception("Используйте: Print(*) или Print(компонент)");
-
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1).Trim();
-
-                                Console.WriteLine($"Печать: {componentName}");
-                                Print(componentName);
-                            }
-                            break;
-
-                        case "Help":
-                            if (string.IsNullOrWhiteSpace(commandParams))
-                            {
-                                DisplayHelpToConsole();
-                            }
-                            else
-                            {
-                                SaveHelpToFile(commandParams);
-                                Console.WriteLine($"Справка сохранена в {commandParams}");
-                            }
-                            break;
-
-                        case "Exit":
-                            Close();
-                            Environment.Exit(0);
-                            break;
-
-                        default:
-                            throw new Exception($"Неизвестная команда '{command}'.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Ошибка: {ex.Message}");
-                    Console.WriteLine("Введите Help для списка команд.");
+                    case "Restore":
+                        Restore(args);
+                        break;
+                    case "Truncate":
+                        Truncate();
+                        break;
+                    case "Print":
+                        Print(args);
+                        break;
+                    case "Exit":
+                        Close();
+                        return;
+                    default:
+                        Console.WriteLine("Неизвестная команда");
+                        break;
                 }
             }
         }
 
-        static bool TryParseCreateCommand(string input, out string filename, out short maxLength)
+        static void Create(string args)
         {
-            filename = null;
-            maxLength = 0;
+            var name = args[..args.IndexOf("(")];
+            var len = short.Parse(args[(args.IndexOf("(") + 1)..args.IndexOf(")")]);
 
-            var parts = input.Split(' ');
-            if (parts.Length != 2)
-                return false;
-
-            filename = parts[0];
-            return short.TryParse(parts[1], out maxLength);
-        }
-
-        static void DisplayHelpToConsole()
-        {
-            Console.WriteLine("Доступные команды:");
-            Console.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
-            Console.WriteLine("  Open <имя_файла> - открыть существующий файл");
-            Console.WriteLine("  Input(компонент, тип) - добавить компонент (тип: Product/Unit/Detail)");
-            Console.WriteLine("  Input(компонент/деталь) - добавить спецификацию");
-            Console.WriteLine("  Delete(компонент) - удалить компонент");
-            Console.WriteLine("  Delete(компонент/деталь) - удалить спецификацию");
-            Console.WriteLine("  Restore(*) - восстановить все удаленные записи");
-            Console.WriteLine("  Restore(компонент) - восстановить компонент");
-            Console.WriteLine("  Truncate - физически удалить помеченные записи");
-            Console.WriteLine("  Print(*) - вывести все компоненты");
-            Console.WriteLine("  Print(компонент) - вывести спецификацию компонента");
-            Console.WriteLine("  Help [файл] - показать справку или сохранить в файл");
-            Console.WriteLine("  Exit - выход");
-        }
-
-        static void SaveHelpToFile(string filename)
-        {
-            using (var writer = new StreamWriter(filename))
-            {
-                writer.WriteLine("Справка по командам PSConsole:");
-                writer.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
-                writer.WriteLine("  Open <имя_файла> - открыть существующий файл");
-                writer.WriteLine("  Input(компонент, тип) - добавить компонент (тип: Product/Unit/Detail)");
-                writer.WriteLine("  Input(компонент/деталь) - добавить спецификацию");
-                writer.WriteLine("  Delete(компонент) - удалить компонент");
-                writer.WriteLine("  Delete(компонент/деталь) - удалить спецификацию");
-                writer.WriteLine("  Restore(*) - восстановить все удаленные записи");
-                writer.WriteLine("  Restore(компонент) - восстановить компонент");
-                writer.WriteLine("  Truncate - физически удалить помеченные записи");
-                writer.WriteLine("  Print(*) - вывести все компоненты");
-                writer.WriteLine("  Print(компонент) - вывести спецификацию компонента");
-                writer.WriteLine("  Help [файл] - показать справку или сохранить в файл");
-                writer.WriteLine("  Exit - выход");
-            }
-        }
-
-        // Методы работы с файлами из второго фрагмента
-        static void Create(string name, short maxLength)
-        {
             // файл компонентов
             using (var fs = new FileStream(name, FileMode.Create))
             using (var bw = new BinaryWriter(fs))
             {
                 bw.Write((byte)'P');
                 bw.Write((byte)'S');
-                bw.Write(maxLength);
+                bw.Write(len);
                 bw.Write(-1);
                 bw.Write((int)fs.Position + 4);
             }
@@ -306,9 +100,6 @@ namespace PSConsole
 
         static void Open(string name)
         {
-            if (compFs != null)
-                Close();
-
             currentFile = name;
             specFile = Path.ChangeExtension(name, ".prs");
 
@@ -320,7 +111,6 @@ namespace PSConsole
             specReader = new BinaryReader(specFs);
             specWriter = new BinaryWriter(specFs);
 
-            compFs.Seek(0, SeekOrigin.Begin);
             if (compReader.ReadByte() != 'P' || compReader.ReadByte() != 'S')
             {
                 Console.WriteLine("Ошибка сигнатуры");
@@ -328,13 +118,23 @@ namespace PSConsole
                 return;
             }
 
-            Console.WriteLine($"Файл '{name}' открыт.");
+            Console.WriteLine("Файлы открыты");
         }
 
-        static void Input(string name, ComponentType type)
+        static void Input(string args)
         {
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
+
+            if (args.Contains("/"))
+            {
+                InputSpec(args);
+                return;
+            }
+
+            var inside = args[(args.IndexOf("(") + 1)..args.IndexOf(")")];
+            var split = inside.Split(',');
+
+            string name = split[0].Trim();
+            ComponentType type = Enum.Parse<ComponentType>(split[1].Trim(), true);
 
             compFs.Seek(2, SeekOrigin.Begin);
             short maxLen = compReader.ReadInt16();
@@ -349,18 +149,17 @@ namespace PSConsole
             compWriter.Write((byte)type); // Type
 
             char[] buf = new char[maxLen];
-            name.CopyTo(0, buf, 0, Math.Min(name.Length, maxLen));
+            name.CopyTo(0, buf, 0, name.Length);
             compWriter.Write(buf);
 
             compFs.Seek(4, SeekOrigin.Begin);
             compWriter.Write(offset);
+
+            Console.WriteLine("Компонент добавлен");
         }
 
         static void InputSpec(string args)
         {
-            if (compFs == null || specFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
-
             var inside = args[(args.IndexOf("(") + 1)..args.IndexOf(")")];
             var split = inside.Split('/');
 
@@ -404,19 +203,19 @@ namespace PSConsole
                 cur = next;
             }
 
-            // если записи нет → создаём новую
+            // если записи нет → создаём новую ВРТ ЗДЕСЬ КОСЯК В СПЕЦИФИК НЕ ДОБАВЛ
             specFs.Seek(0, SeekOrigin.End);
-            int newOffset = (int)specFs.Position;
 
-            specWriter.Write((byte)0);      // не удалено
-            specWriter.Write(childOffset);  // компонент
-            specWriter.Write((short)1);     // количество
-            specWriter.Write(head);          // next (старая голова)
+            specWriter.Write((byte)0);
+            specWriter.Write(childOffset);
+            specWriter.Write((short)1);
+            specWriter.Write(head);
+            int last = (int)specFs.Position;
 
             // новая запись становится головой
             specFs.Seek(0, SeekOrigin.Begin);
-            specWriter.Write(newOffset);
-            specWriter.Write(8);  // free (не используется)
+            specWriter.Write(8);
+            specWriter.Write(last);
 
             Console.WriteLine("Спецификация добавлена");
         }
@@ -432,9 +231,9 @@ namespace PSConsole
                 compFs.Seek(head, SeekOrigin.Begin);
 
                 int next = compReader.ReadInt32();
-                compReader.ReadInt32(); // SpecHead
+                compReader.ReadInt32();
                 byte del = compReader.ReadByte();
-                compReader.ReadByte(); // Type
+                compReader.ReadByte();
                 string cur = new string(compReader.ReadChars(len)).Trim('\0');
 
                 if (cur == name && del == 0)
@@ -446,45 +245,31 @@ namespace PSConsole
             return -1;
         }
 
-        static void Print(string param)
+        static void Print(string args)
         {
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
 
-            if (param == "*")
+            while (head != -1)
             {
-                compFs.Seek(2, SeekOrigin.Begin);
-                short len = compReader.ReadInt16();
-                int head = compReader.ReadInt32();
+                compFs.Seek(head, SeekOrigin.Begin);
+                int next = compReader.ReadInt32();
+                int spec = compReader.ReadInt32();
+                byte del = compReader.ReadByte();
+                byte type = compReader.ReadByte();
+                string name = new string(compReader.ReadChars(len)).Trim('\0');
 
-                Console.WriteLine("Список компонентов:");
-                Console.WriteLine("-------------------");
-                while (head != -1)
-                {
-                    compFs.Seek(head, SeekOrigin.Begin);
-                    int next = compReader.ReadInt32();
-                    int spec = compReader.ReadInt32();
-                    byte del = compReader.ReadByte();
-                    byte type = compReader.ReadByte();
-                    string name = new string(compReader.ReadChars(len)).Trim('\0');
+                if (del == 0)
+                    Console.WriteLine($"{name,-20} {(ComponentType)type}");
 
-                    if (del == 0)
-                        Console.WriteLine($"{name,-20} {(ComponentType)type}");
-
-                    head = next;
-                }
-            }
-            else
-            {
-                // Здесь можно реализовать вывод спецификации компонента
-                Console.WriteLine($"Вывод спецификации для {param} (в разработке)");
+                head = next;
             }
         }
 
-        static void Delete(string name)
+        static void Delete(string args)
         {
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
+            string name = args[(args.IndexOf("(") + 1)..args.IndexOf(")")].Trim();
 
             compFs.Seek(2, SeekOrigin.Begin);
             short len = compReader.ReadInt16();
@@ -517,9 +302,6 @@ namespace PSConsole
 
         static void RestoreAll()
         {
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
-
             compFs.Seek(2, SeekOrigin.Begin);
             short len = compReader.ReadInt16();
             int head = compReader.ReadInt32();
@@ -548,10 +330,15 @@ namespace PSConsole
             Console.WriteLine($"Восстановлено записей: {count}");
         }
 
-        static void Restore(string name)
+        static void Restore(string args)
         {
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
+            if (args.Contains("*"))
+            {
+                RestoreAll();
+                return;
+            }
+
+            string name = args[(args.IndexOf("(") + 1)..args.IndexOf(")")].Trim();
 
             compFs.Seek(2, SeekOrigin.Begin);
             short len = compReader.ReadInt16();
@@ -584,9 +371,6 @@ namespace PSConsole
 
         static void Truncate()
         {
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
-
             string tempFile = currentFile + ".tmp";
 
             compFs.Seek(2, SeekOrigin.Begin);
@@ -665,13 +449,6 @@ namespace PSConsole
             specReader?.Close();
             specWriter?.Close();
             specFs?.Close();
-
-            compReader = null;
-            compWriter = null;
-            compFs = null;
-            specReader = null;
-            specWriter = null;
-            specFs = null;
         }
     }
 }
