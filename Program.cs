@@ -1,347 +1,454 @@
-﻿using System.IO;
-using Form;
+﻿using Microsoft.VisualBasic.FileIO;
+using System;
+using System.IO;
+using System.Reflection.PortableExecutable;
 
-namespace TaMP
+namespace PSConsole
 {
-    internal class Program
+    class Program
     {
-        static public void Create(string fileName, short maxLength)
+        static FileStream compFs;
+        static BinaryReader compReader;
+        static BinaryWriter compWriter;
+        static string currentFile;
+        static FileStream specFs;
+        static BinaryReader specReader;
+        static BinaryWriter specWriter;
+        static string specFile;
+
+        public enum ComponentType : byte
         {
-            using (FileStream fs = new FileStream(fileName, FileMode.Create))
-            using (BinaryWriter writer = new BinaryWriter(fs))
+            Product = 1,
+            Unit = 2,
+            Detail = 3
+        }
+
+        static void Main()
+        {
+            while (true)
             {
-                writer.Write((byte)'P');
-                writer.Write((byte)'S');
-                writer.Write(maxLength);
-                writer.Write(-1);
-                writer.Write(-1);
-                int freeOffset = (int)fs.Position;
-                writer.Seek(freeOffset - 4, SeekOrigin.Begin);
-                writer.Write(freeOffset);
+                Console.Write("PS> ");
+                var cmd = Console.ReadLine();
+                if (string.IsNullOrWhiteSpace(cmd)) continue;
+
+                var parts = cmd.Split(' ', 2);
+                var command = parts[0];
+                var args = parts.Length > 1 ? parts[1] : "";
+
+                switch (command)
+                {
+                    case "Create":
+                        Create(args);
+                        break;
+                    case "Open":
+                        Open(args);
+                        break;
+                    case "Input":
+                        Input(args);
+                        break;
+                    case "Delete":
+                        Delete(args);
+                        break;
+
+                    case "Restore":
+                        Restore(args);
+                        break;
+                    case "Truncate":
+                        Truncate();
+                        break;
+                    case "Print":
+                        Print(args);
+                        break;
+                    case "Exit":
+                        Close();
+                        return;
+                    default:
+                        Console.WriteLine("Неизвестная команда");
+                        break;
+                }
             }
         }
 
-        static public FileStream Open(string fileName)
+        static void Create(string args)
         {
-            if (!File.Exists(fileName))
-            {
-                Console.WriteLine("Файла не существует");
-                return null;
-            }
-            FileStream fs = new(fileName, FileMode.Open, FileAccess.ReadWrite);
-            BinaryReader reader = new BinaryReader(fs);
+            var name = args[..args.IndexOf("(")];
+            var len = short.Parse(args[(args.IndexOf("(") + 1)..args.IndexOf(")")]);
 
-            byte sign1 = reader.ReadByte();
-            byte sign2 = reader.ReadByte();
-            if (sign1 != (byte)'P' || sign2 != (byte)'P')
+            // файл компонентов
+            using (var fs = new FileStream(name, FileMode.Create))
+            using (var bw = new BinaryWriter(fs))
             {
-                Console.WriteLine("Ошибка: неправильная сигнатура файла");
-                reader.Close();
-                fs.Close();
-                return null;
+                bw.Write((byte)'P');
+                bw.Write((byte)'S');
+                bw.Write(len);
+                bw.Write(-1);
+                bw.Write((int)fs.Position + 4);
             }
 
-            short maxLength = reader.ReadInt16();
-            int head = reader.ReadInt32();
-            int tail = reader.ReadInt32();
+            // файл спецификаций
+            string prs = Path.ChangeExtension(name, ".prs");
 
-            Console.WriteLine("Файл успешно прочитан");
-            Console.WriteLine($"Длина записи данных: {maxLength}");
-            Console.WriteLine($"Первая логическая запись: {head}");
-            Console.WriteLine($"Свободная область: {tail}");
-            return fs;
+            using (var fs = new FileStream(prs, FileMode.Create))
+            using (var bw = new BinaryWriter(fs))
+            {
+                bw.Write(-1); // first
+                bw.Write(8);  // free
+            }
+
+            Console.WriteLine("Файлы PS и PRS созданы");
         }
 
-        static public void Input(FileStream fs, string name, Form.Type type)
+        static void Open(string name)
         {
-            fs.Seek(2, SeekOrigin.Begin);
-            using BinaryReader reader = new(fs);
-            using BinaryWriter writer = new(fs);
+            currentFile = name;
+            specFile = Path.ChangeExtension(name, ".prs");
 
-            short maxLength = reader.ReadInt16();
-            int head = reader.ReadInt32();
-            int tail = reader.ReadInt32();
+            compFs = new FileStream(name, FileMode.Open, FileAccess.ReadWrite);
+            compReader = new BinaryReader(compFs);
+            compWriter = new BinaryWriter(compFs);
 
-            if (name.Length > maxLength)
+            specFs = new FileStream(specFile, FileMode.Open, FileAccess.ReadWrite);
+            specReader = new BinaryReader(specFs);
+            specWriter = new BinaryWriter(specFs);
+
+            if (compReader.ReadByte() != 'P' || compReader.ReadByte() != 'S')
             {
-                Console.WriteLine("Имя превышает допустимую длину");
+                Console.WriteLine("Ошибка сигнатуры");
+                Close();
                 return;
             }
 
-            // Смещение новой записи
-            fs.Seek(0, SeekOrigin.End);
-            int newOffset = (int)fs.Position;
+            Console.WriteLine("Файлы открыты");
+        }
 
-            // --- Запись новой записи ---
-            writer.Write(-1);                 // Next
-            writer.Write(-1);                 // Specs
-            writer.Write((byte)0);            // ForDelete
-            writer.Write((byte)type);         // Type
+        static void Input(string args)
+        {
 
-            // Запись строки фиксированной длины
-            char[] buffer = new char[maxLength];
-            name.CopyTo(0, buffer, 0, name.Length);
-            writer.Write(buffer);
-
-            // --- Обновление списка ---
-            if (head == -1)
+            if (args.Contains("/"))
             {
-                // список пуст
-                head = newOffset;
-            }
-            else
-            {
-                // обновляем Next у старого tail
-                fs.Seek(tail, SeekOrigin.Begin);
-                writer.Write(newOffset);
+                InputSpec(args);
+                return;
             }
 
-            tail = newOffset;
+            var inside = args[(args.IndexOf("(") + 1)..args.IndexOf(")")];
+            var split = inside.Split(',');
 
-            // --- Перезапись head и tail в заголовке ---
-            fs.Seek(4, SeekOrigin.Begin);
-            writer.Write(head);
-            writer.Write(tail);
+            string name = split[0].Trim();
+            ComponentType type = Enum.Parse<ComponentType>(split[1].Trim(), true);
+
+            compFs.Seek(2, SeekOrigin.Begin);
+            short maxLen = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            compFs.Seek(0, SeekOrigin.End);
+            int offset = (int)compFs.Position;
+
+            compWriter.Write(head);       // Next
+            compWriter.Write(-1);         // SpecHead
+            compWriter.Write((byte)0);    // Deleted
+            compWriter.Write((byte)type); // Type
+
+            char[] buf = new char[maxLen];
+            name.CopyTo(0, buf, 0, name.Length);
+            compWriter.Write(buf);
+
+            compFs.Seek(4, SeekOrigin.Begin);
+            compWriter.Write(offset);
 
             Console.WriteLine("Компонент добавлен");
         }
 
-        static public bool TryParseCreateCommand(string commandParams, out string filename, out short maxLength)
+        static void InputSpec(string args)
         {
-            filename = null;
-            maxLength = 0;
+            var inside = args[(args.IndexOf("(") + 1)..args.IndexOf(")")];
+            var split = inside.Split('/');
 
-            if (!commandParams.Contains("(") || !commandParams.Contains(")"))
-            {
-                Console.WriteLine("Ошибка: Неверный формат команды");
-                return false;
-            }
+            string parent = split[0].Trim();
+            string child = split[1].Trim();
 
-            filename = commandParams.Substring(0, commandParams.IndexOf("("));
-            if (string.IsNullOrWhiteSpace(filename))
-            {
-                Console.WriteLine("Ошибка: Имя файла не может быть пустым");
-                return false;
-            }
+            int parentOffset = FindComponent(parent);
+            int childOffset = FindComponent(child);
 
-            string lengthStr = commandParams.Substring(commandParams.IndexOf("(") + 1, commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1);
-            if (string.IsNullOrWhiteSpace(lengthStr))
+            if (parentOffset == -1 || childOffset == -1)
             {
-                Console.WriteLine("Ошибка: Длина записи не может быть пустой");
-                return false;
-            }
-            if (!short.TryParse(lengthStr, out maxLength))
-            {
-                Console.WriteLine("Ошибка: Длина записи должна быть числом");
-                return false;
-            }
-            if (maxLength <= 0)
-            {
-                Console.WriteLine("Ошибка: Длина записи должна быть положительным числом");
-                return false;
+                Console.WriteLine("Компонент не найден");
+                return;
             }
 
-            return true;
+            // читаем голову списка
+            specFs.Seek(0, SeekOrigin.Begin);
+            int head = specReader.ReadInt32();
+
+            int cur = head;
+
+            while (cur != -1)
+            {
+                specFs.Seek(cur, SeekOrigin.Begin);
+
+                byte del = specReader.ReadByte();
+                int comp = specReader.ReadInt32();
+                short count = specReader.ReadInt16();
+                int next = specReader.ReadInt32();
+
+                // если уже есть такой child → увеличиваем count
+                if (comp == childOffset && del == 0)
+                {
+                    specFs.Seek(cur + 5, SeekOrigin.Begin);
+                    specWriter.Write((short)(count + 1));
+
+                    Console.WriteLine("Кратность увеличена");
+                    return;
+                }
+
+                cur = next;
+            }
+
+            // если записи нет → создаём новую ВРТ ЗДЕСЬ КОСЯК В СПЕЦИФИК НЕ ДОБАВЛ
+            specFs.Seek(0, SeekOrigin.End);
+
+            specWriter.Write((byte)0);
+            specWriter.Write(childOffset);
+            specWriter.Write((short)1);
+            specWriter.Write(head);
+            int last = (int)specFs.Position;
+
+            // новая запись становится головой
+            specFs.Seek(0, SeekOrigin.Begin);
+            specWriter.Write(8);
+            specWriter.Write(last);
+
+            Console.WriteLine("Спецификация добавлена");
         }
 
-        static void DisplayHelpToConsole()
+        static int FindComponent(string name)
         {
-            Console.WriteLine("\n=== Доступные команды ===");
-            Console.WriteLine("Create имя_файла(длина_записи) - создает новый файл");
-            Console.WriteLine("Open имя_файла - открывает существующий файл");
-            Console.WriteLine("Input(имя_компонента, тип) - добавляет компонент в открытый файл");
-            Console.WriteLine("Input(имя_компонента/имя_детали) - добавляет деталь в открытый файл");
-            Console.WriteLine("Delete(имя_компонента) - помечает компонент как удаленный");
-            Console.WriteLine("Delete(имя_компонента/имя_детали) - помечает деталь как удаленную");
-            Console.WriteLine("Restore(имя_компонента) - восстанавливает удаленный компонент");
-            Console.WriteLine("Restore * - восстанавливает все удаленные записи");
-            Console.WriteLine("Truncate - физически удаляет помеченные записи");
-            Console.WriteLine("Print(имя_компонента) - выводит информацию о компоненте");
-            Console.WriteLine("Print * - выводит информацию о всех записях");
-            Console.WriteLine("Help - выводит список команд");
-            Console.WriteLine("Help имя_файла - сохраняет список команд в файл");
-            Console.WriteLine("Exit - завершает работу программы");
-            Console.WriteLine("===========================\n");
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            while (head != -1)
+            {
+                compFs.Seek(head, SeekOrigin.Begin);
+
+                int next = compReader.ReadInt32();
+                compReader.ReadInt32();
+                byte del = compReader.ReadByte();
+                compReader.ReadByte();
+                string cur = new string(compReader.ReadChars(len)).Trim('\0');
+
+                if (cur == name && del == 0)
+                    return head;
+
+                head = next;
+            }
+
+            return -1;
         }
 
-        static void SaveHelpToFile(string fileName)
+        static void Print(string args)
         {
-            try
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            while (head != -1)
             {
-                using (StreamWriter writer = new StreamWriter(fileName))
-                {
-                    writer.WriteLine("=== Доступные команды ===");
-                    writer.WriteLine("Create имя_файла(длина_записи) - создает новый файл");
-                    writer.WriteLine("Open имя_файла - открывает существующий файл");
-                    writer.WriteLine("Input(имя_компонента, тип) - добавляет компонент в открытый файл");
-                    writer.WriteLine("Input(имя_компонента/имя_детали) - добавляет деталь в открытый файл");
-                    writer.WriteLine("Delete(имя_компонента) - помечает компонент как удаленный");
-                    writer.WriteLine("Delete(имя_компонента/имя_детали) - помечает деталь как удаленную");
-                    writer.WriteLine("Restore(имя_компонента) - восстанавливает удаленный компонент");
-                    writer.WriteLine("Restore * - восстанавливает все удаленные записи");
-                    writer.WriteLine("Truncate - физически удаляет помеченные записи");
-                    writer.WriteLine("Print(имя_компонента) - выводит информацию о компоненте");
-                    writer.WriteLine("Print * - выводит информацию о всех записях");
-                    writer.WriteLine("Help - выводит список команд");
-                    writer.WriteLine("Exit - завершает работу программы");
-                    writer.WriteLine("===========================");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Ошибка при сохранении справки в файл: {ex.Message}");
+                compFs.Seek(head, SeekOrigin.Begin);
+                int next = compReader.ReadInt32();
+                int spec = compReader.ReadInt32();
+                byte del = compReader.ReadByte();
+                byte type = compReader.ReadByte();
+                string name = new string(compReader.ReadChars(len)).Trim('\0');
+
+                if (del == 0)
+                    Console.WriteLine($"{name,-20} {(ComponentType)type}");
+
+                head = next;
             }
         }
 
-        static void Main(string[] args)
+        static void Delete(string args)
         {
-            FileStream fs = null;
-            while (true)
+            string name = args[(args.IndexOf("(") + 1)..args.IndexOf(")")].Trim();
+
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            while (head != -1)
             {
-                Console.Write("PS> ");
-                string command = Console.ReadLine();
-                string[] splittedCommand = command.Split(' ');
-                string commandType = splittedCommand[0];
-                string commandParams = string.Empty;
-                for (int i = 1; i < command.Split(' ').Length; i++)
+                compFs.Seek(head, SeekOrigin.Begin);
+
+                int next = compReader.ReadInt32();
+                compReader.ReadInt32(); // SpecHead
+                long delPos = compFs.Position;
+                byte deleted = compReader.ReadByte();
+                compReader.ReadByte(); // Type
+                string curName = new string(compReader.ReadChars(len)).Trim('\0');
+
+                if (curName == name && deleted == 0)
                 {
-                    commandParams += splittedCommand[i] + ' ';
+                    compFs.Seek(delPos, SeekOrigin.Begin);
+                    compWriter.Write((byte)1);
+                    Console.WriteLine("Запись помечена как удалённая");
+                    return;
                 }
-                commandParams = commandParams.Trim();
 
-                switch (commandType)
-                {
-                    case "Create":
-                        if (TryParseCreateCommand(commandParams, out string filename, out short maxLength))
-                        {
-                            Console.WriteLine($"Имя файла: {filename}");
-                            Console.WriteLine($"Длина записи: {maxLength}");
-                            try
-                            {
-                                Create(filename, maxLength);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"Ошибка при создании файла: {ex.Message}");
-                            }
-                        }
-                        break;
-
-                    case "Open":
-                        filename = commandParams;
-                        fs = Open(filename);
-                        break;
-
-                    case "Input":
-                        {
-                            if (commandParams.Contains("/"))
-                            {
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf("/") - commandParams.IndexOf("(") - 1);
-
-                                string detailName = commandParams.Substring(
-                                    commandParams.IndexOf("/") + 1,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf("/") - 1);
-
-                                Console.WriteLine(componentName);
-                                Console.WriteLine(detailName);
-                            }
-                            else
-                            {
-                                string componentName = commandParams.Substring(
-                                    commandParams.IndexOf("(") + 1,
-                                    commandParams.IndexOf(",") - commandParams.IndexOf("(") - 1);
-
-                                string componentType = commandParams.Substring(
-                                    commandParams.IndexOf(", ") + 2,
-                                    commandParams.IndexOf(")") - commandParams.IndexOf(", ") - 2);
-
-                                Console.WriteLine(componentName);
-                                Console.WriteLine(componentType);
-                                Input(fs, componentName, Form.Type.Product);
-                            }
-                            break;
-                        }
-
-                    case "Delete":
-                        if (commandParams.Contains("/"))
-                        {
-                            string componentName = commandParams.Substring(
-                                commandParams.IndexOf("(") + 1,
-                                commandParams.IndexOf("/") - commandParams.IndexOf("(") - 1);
-
-                            string detailName = commandParams.Substring(
-                                commandParams.IndexOf("/") + 1,
-                                commandParams.IndexOf(")") - commandParams.IndexOf("/") - 1);
-
-                            Console.WriteLine(componentName);
-                            Console.WriteLine(detailName);
-                        }
-                        else
-                        {
-                            string componentName = commandParams.Substring(
-                                commandParams.IndexOf("(") + 1,
-                                commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1);
-
-                            Console.WriteLine(componentName);
-                        }
-                        break;
-
-                    case "Restore":
-                        if (commandParams.Contains("*"))
-                        {
-                            Console.WriteLine("Restore all");
-                        }
-                        else
-                        {
-                            string componentName = commandParams.Substring(
-                                commandParams.IndexOf("(") + 1,
-                                commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1);
-
-                            Console.WriteLine(componentName);
-                        }
-                        break;
-
-                    case "Truncate":
-                        Console.WriteLine("Truncate");
-                        break;
-
-                    case "Print":
-                        if (commandParams.Contains("*"))
-                        {
-                            Console.WriteLine("Print all");
-                        }
-                        else
-                        {
-                            string componentName = commandParams.Substring(
-                                commandParams.IndexOf("(") + 1,
-                                commandParams.IndexOf(")") - commandParams.IndexOf("(") - 1);
-
-                            Console.WriteLine(componentName);
-                        }
-                        break;
-
-                    case "Help":
-                        if (string.IsNullOrWhiteSpace(commandParams))
-                        {
-                            DisplayHelpToConsole();
-                        }
-                        else
-                        {
-                            SaveHelpToFile(commandParams);
-                        }
-                        break;
-
-                    case "Exit":
-                        fs.Close();
-                        Environment.Exit(0);
-                        break;
-                    default:
-                        Console.WriteLine("Неизвестная команда. Введите Help для получения списка команд.");
-                        break;
-                }
+                head = next;
             }
+
+            Console.WriteLine("Компонент не найден");
+        }
+
+        static void RestoreAll()
+        {
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            int count = 0;
+
+            while (head != -1)
+            {
+                compFs.Seek(head, SeekOrigin.Begin);
+
+                int next = compReader.ReadInt32();
+                compReader.ReadInt32();
+                long delPos = compFs.Position;
+                byte deleted = compReader.ReadByte();
+
+                if (deleted == 1)
+                {
+                    compFs.Seek(delPos, SeekOrigin.Begin);
+                    compWriter.Write((byte)0);
+                    count++;
+                }
+
+                head = next;
+            }
+
+            Console.WriteLine($"Восстановлено записей: {count}");
+        }
+
+        static void Restore(string args)
+        {
+            if (args.Contains("*"))
+            {
+                RestoreAll();
+                return;
+            }
+
+            string name = args[(args.IndexOf("(") + 1)..args.IndexOf(")")].Trim();
+
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            while (head != -1)
+            {
+                compFs.Seek(head, SeekOrigin.Begin);
+
+                int next = compReader.ReadInt32();
+                compReader.ReadInt32();
+                long delPos = compFs.Position;
+                byte deleted = compReader.ReadByte();
+                compReader.ReadByte();
+                string curName = new string(compReader.ReadChars(len)).Trim('\0');
+
+                if (curName == name && deleted == 1)
+                {
+                    compFs.Seek(delPos, SeekOrigin.Begin);
+                    compWriter.Write((byte)0);
+                    Console.WriteLine("Запись восстановлена");
+                    return;
+                }
+
+                head = next;
+            }
+
+            Console.WriteLine("Удалённая запись не найдена");
+        }
+
+        static void Truncate()
+        {
+            string tempFile = currentFile + ".tmp";
+
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            using var newFs = new FileStream(tempFile, FileMode.Create);
+            using var newBw = new BinaryWriter(newFs);
+
+            newBw.Write((byte)'P');
+            newBw.Write((byte)'S');
+            newBw.Write(len);
+            newBw.Write(-1); // new head
+            newBw.Write(-1); // free
+
+            int newHead = -1;
+            int newTail = -1;
+
+            while (head != -1)
+            {
+                compFs.Seek(head, SeekOrigin.Begin);
+
+                int next = compReader.ReadInt32();
+                int spec = compReader.ReadInt32();
+                byte deleted = compReader.ReadByte();
+                byte type = compReader.ReadByte();
+                char[] name = compReader.ReadChars(len);
+
+                if (deleted == 0)
+                {
+                    int pos = (int)newFs.Position;
+
+                    newBw.Write(-1);
+                    newBw.Write(spec);
+                    newBw.Write((byte)0);
+                    newBw.Write(type);
+                    newBw.Write(name);
+
+                    if (newHead == -1)
+                        newHead = pos;
+                    else
+                    {
+                        newFs.Seek(newTail, SeekOrigin.Begin);
+                        newBw.Write(pos);
+                    }
+
+                    newTail = pos;
+                    newFs.Seek(0, SeekOrigin.End);
+                }
+
+                head = next;
+            }
+
+            newFs.Seek(4, SeekOrigin.Begin);
+            newBw.Write(newHead);
+            newBw.Write((int)newFs.Position);
+
+            Close();
+            newFs?.Close();
+            newBw?.Close();
+
+            File.Delete(currentFile);
+            File.Move(tempFile, currentFile);
+
+            Open(currentFile);
+
+            Console.WriteLine("Физическое удаление завершено");
+        }
+
+        static void Close()
+        {
+            compReader?.Close();
+            compWriter?.Close();
+            compFs?.Close();
+
+            specReader?.Close();
+            specWriter?.Close();
+            specFs?.Close();
         }
     }
 }
