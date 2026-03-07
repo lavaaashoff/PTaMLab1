@@ -372,8 +372,8 @@
             using (var fs = new FileStream(prs, FileMode.Create))
             using (var bw = new BinaryWriter(fs))
             {
-                bw.Write(-1); // first
-                bw.Write(8);  // free
+                bw.Write(-1); // Указатель на логически первую запись
+                bw.Write(8);  // Указатель на свободную область
             }
 
             // файл компонентов
@@ -421,15 +421,17 @@
             compFs.Seek(2, SeekOrigin.Begin);
             short maxLen = compReader.ReadInt16();
             int head = compReader.ReadInt32();
+            int free = compReader.ReadInt32();
 
-            compFs.Seek(0, SeekOrigin.End);
+            compFs.Seek(free, SeekOrigin.Begin);
             int offset = (int)compFs.Position;
 
-            compWriter.Write(head);       // Next
-            compWriter.Write(-1);         // SpecHead
-            compWriter.Write((byte)0);    // Deleted
+            compWriter.Write((byte)0); // Бит удаления
+            compWriter.Write(-1); // Указатель на запись файла спецификаций
+            compWriter.Write(head); // Указатель на следующую запись списка изделий
             compWriter.Write((byte)type); // Type
 
+            // ВОТ ТУТ ХУЙ РАЗБЕРЁШЬ ЧЁ СО СТРУКТУРОЙ ФАЙЛА
             char[] buf = new char[maxLen];
             name.ToCharArray().CopyTo(buf, 0);
             compWriter.Write(buf);
