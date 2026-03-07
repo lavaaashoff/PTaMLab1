@@ -366,17 +366,6 @@
 
         static void Create(string filename, short maxLength)
         {
-            // файл компонентов
-            using (var fs = new FileStream(filename, FileMode.Create))
-            using (var bw = new BinaryWriter(fs))
-            {
-                bw.Write((byte)'P');
-                bw.Write((byte)'S');
-                bw.Write(maxLength);
-                bw.Write(-1);
-                bw.Write((int)fs.Position + 4);
-            }
-
             // файл спецификаций
             string prs = Path.ChangeExtension(filename, ".prs");
 
@@ -385,6 +374,22 @@
             {
                 bw.Write(-1); // first
                 bw.Write(8);  // free
+            }
+
+            // файл компонентов
+            using (var fs = new FileStream(filename, FileMode.Create))
+            using (var bw = new BinaryWriter(fs))
+            {
+                bw.Write((byte)'P');
+                bw.Write((byte)'S');
+                bw.Write(maxLength); // Длина записи данных
+                bw.Write(-1); // Указатель на логически первую запись
+                bw.Write(28); // Указатель на свободную область
+
+                byte[] nameBytes = new byte[16];
+                var src = System.Text.Encoding.ASCII.GetBytes(prs);
+                Array.Copy(src, nameBytes, Math.Min(src.Length, 16));
+                bw.Write(nameBytes);
             }
         }
 
