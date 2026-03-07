@@ -149,6 +149,24 @@
             Console.WriteLine($"Компонент: {componentName}");
             Console.WriteLine($"Деталь: {detailName}");
 
+            if (compFs != null)
+            {
+                int parentOffset = FindComponent(componentName);
+                if (parentOffset != -1)
+                {
+                    compFs.Seek(parentOffset, SeekOrigin.Begin);
+                    compReader.ReadInt32(); // next
+                    compReader.ReadInt32(); // specHead
+                    compReader.ReadByte();  // deleted
+                    byte parentType = compReader.ReadByte();
+
+                    if ((ComponentType)parentType == ComponentType.Detail)
+                    {
+                        throw new Exception("Ошибка: Деталь не может содержать другие компоненты (тупиковый компонент)");
+                    }
+                }
+            }
+
             InputSpec(args);
         }
 
@@ -449,6 +467,33 @@
                 Console.WriteLine("Компонент не найден");
                 return;
             }
+            // Проверяем тип родительского компонента
+            compFs.Seek(parentOffset, SeekOrigin.Begin);
+            compReader.ReadInt32(); 
+            compReader.ReadInt32(); 
+            compReader.ReadByte();  
+            byte parentType = compReader.ReadByte();
+
+            // Проверяем тип дочернего компонента
+            compFs.Seek(childOffset, SeekOrigin.Begin);
+            compReader.ReadInt32(); // пропускаем next
+            compReader.ReadInt32(); // пропускаем specHead
+            compReader.ReadByte();  // пропускаем deleted
+            byte childType = compReader.ReadByte();
+
+
+            if ((ComponentType)parentType == ComponentType.Detail)
+            {
+                Console.WriteLine("Ошибка: Деталь не может иметь спецификаций");
+                return;
+            }
+
+            if (parentOffset == childOffset)
+            {
+                Console.WriteLine("Ошибка: Компонент не может ссылаться сам на себя");
+                return;
+            }
+
 
             // читаем голову списка
             specFs.Seek(0, SeekOrigin.Begin);
