@@ -119,7 +119,6 @@
         {
             if (string.IsNullOrWhiteSpace(args))
                 throw new Exception("Укажите имя файла.");
-
             string filename = Path.ChangeExtension(args.Trim(), ".prd");
 
             if (!Open(filename))
@@ -329,21 +328,20 @@
         static void DisplayHelpToConsole()
         {
             Console.WriteLine("Доступные команды:");
-            Console.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
-            Console.WriteLine("  Open <имя_файла> - открыть существующий файл");
-            Console.WriteLine("  Input(компонент, тип) - добавить компонент");
-            Console.WriteLine("  Типы компонентов (можно указывать словом или цифрой):h");
+            Console.WriteLine("  Create <имя_файла_компонентов>(<длина_записи>[, <имя_файла_спецификаций>]) - создать новый файл");
+            Console.WriteLine("  Open <имя_файла> - открыть существующий файл компонентов");
+            Console.WriteLine("  Input (компонент, тип) - добавить компонент");
             Console.WriteLine("  Product (1) - изделие");
             Console.WriteLine("  Unit (2)    - узел");
             Console.WriteLine("  Detail (3)  - деталь");
-            Console.WriteLine("  Input(компонент/деталь) - добавить спецификацию");
-            Console.WriteLine("  Delete(компонент) - удалить компонент");
-            Console.WriteLine("  Delete(компонент/деталь) - удалить спецификацию");
-            Console.WriteLine("  Restore(*) - восстановить все удаленные записи");
-            Console.WriteLine("  Restore(компонент) - восстановить конкретный компонент");
+            Console.WriteLine("  Input (компонент/деталь) - добавить спецификацию");
+            Console.WriteLine("  Delete (компонент) - удалить компонент");
+            Console.WriteLine("  Delete (компонент/деталь) - удалить спецификацию");
+            Console.WriteLine("  Restore * - восстановить все удаленные записи");
+            Console.WriteLine("  Restore (компонент) - восстановить конкретный компонент");
             Console.WriteLine("  Truncate - физически удалить помеченные записи");
-            Console.WriteLine("  Print(*) - вывести все компоненты");
-            Console.WriteLine("  Print(компонент) - вывести информацию о компоненте");
+            Console.WriteLine("  Print * - вывести все компоненты");
+            Console.WriteLine("  Print (компонент) - вывести информацию о компоненте");
             Console.WriteLine("  Help [файл] - показать справку или сохранить в файл");
             Console.WriteLine("  Exit - выход из программы");
         }
@@ -353,13 +351,12 @@
             using (var writer = new StreamWriter(filename))
             {
                 writer.WriteLine("Справка по командам PSConsole:");
-                writer.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
-                writer.WriteLine("  Open <имя_файла> - открыть существующий файл");
+                writer.WriteLine("  Create <имя_файла_компонентов>(<длина_записи>[, <имя_файла_спецификаций>]) - создать новый файл");
+                writer.WriteLine("  Open <имя_файла> - открыть существующий файл компонентов");
                 writer.WriteLine("  Input(компонент, тип) - добавить компонент");
-                writer.WriteLine("      Типы компонентов (можно указывать словом или цифрой):");
-                writer.WriteLine("          Product (1) - изделие");
-                writer.WriteLine("          Unit (2)    - узел");
-                writer.WriteLine("          Detail (3)  - деталь");
+                writer.WriteLine("  Product (1) - изделие");
+                writer.WriteLine("  Unit (2)    - узел");
+                writer.WriteLine("  Detail (3)  - деталь");
                 writer.WriteLine("  Input(компонент/деталь) - добавить спецификацию");
                 writer.WriteLine("  Delete(компонент) - удалить компонент");
                 writer.WriteLine("  Delete(компонент/деталь) - удалить спецификацию");
