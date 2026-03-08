@@ -659,14 +659,12 @@
             Console.WriteLine("Компонент не найден");
         }
 
-        static void PrintSpecifications(int head)
+        static void PrintSpecifications(int head, int len)
         {
             int cur = head;
-
             while (cur != -1)
             {
                 specFs.Seek(cur, SeekOrigin.Begin);
-
                 byte del = specReader.ReadByte();
                 int comp = specReader.ReadInt32();
                 short count = specReader.ReadInt16();
@@ -674,14 +672,12 @@
 
                 if (del == 0)
                 {
-                    compFs.Seek(2, SeekOrigin.Begin);
-                    int len = compReader.ReadInt16();
                     compFs.Seek(comp, SeekOrigin.Begin);
-                    byte delComp = compReader.ReadByte();
-                    int specHead = compReader.ReadInt32();
-                    int nextComp = compReader.ReadInt32();
+                    compReader.ReadByte();    // del
+                    compReader.ReadInt32();   // spec
+                    compReader.ReadInt32();   // next
                     byte typeComp = compReader.ReadByte();
-                    string name = new string(compReader.ReadChars(len)).Trim('\0');
+                    string name = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                     Console.WriteLine($"  - {name} ({(ComponentType)typeComp}) x{count}");
                 }
