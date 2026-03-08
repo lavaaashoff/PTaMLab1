@@ -564,12 +564,11 @@
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
-
-                byte del = compReader.ReadByte(); // бит удаления
-                compReader.ReadInt32(); // указатель на спецификации
-                int next = compReader.ReadInt32(); // указатель на следующую запись
-                compReader.ReadByte(); // бит типа
-                string cur = new string(compReader.ReadChars(len)).Trim('\0', ' '); // область данных
+                byte del = compReader.ReadByte();
+                compReader.ReadInt32(); // spec
+                int next = compReader.ReadInt32();
+                compReader.ReadByte(); // type
+                string cur = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (cur == name && del == 0)
                     return head;
