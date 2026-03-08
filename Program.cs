@@ -155,9 +155,9 @@
                 if (parentOffset != -1)
                 {
                     compFs.Seek(parentOffset, SeekOrigin.Begin);
-                    compReader.ReadInt32(); // next
-                    compReader.ReadInt32(); // specHead
-                    compReader.ReadByte();  // deleted
+                    compReader.ReadByte();  // Бит удаления
+                    compReader.ReadInt32(); // Указатель на спецификации
+                    compReader.ReadInt32(); // Следующая запись
                     byte parentType = compReader.ReadByte();
 
                     if ((ComponentType)parentType == ComponentType.Detail)
@@ -489,16 +489,16 @@
             }
             // Проверяем тип родительского компонента
             compFs.Seek(parentOffset, SeekOrigin.Begin);
-            compReader.ReadInt32(); 
-            compReader.ReadInt32(); 
-            compReader.ReadByte();  
+            compReader.ReadByte(); // Бит удаления
+            compReader.ReadInt32(); // Указатель на спецификации
+            compReader.ReadInt32(); // Указатель на следующую запись
             byte parentType = compReader.ReadByte();
 
             // Проверяем тип дочернего компонента
             compFs.Seek(childOffset, SeekOrigin.Begin);
-            compReader.ReadInt32(); // пропускаем next
-            compReader.ReadInt32(); // пропускаем specHead
-            compReader.ReadByte();  // пропускаем deleted
+            compReader.ReadByte(); // Бит удаления
+            compReader.ReadInt32(); // Указатель на спецификации
+            compReader.ReadInt32(); // Указатель на следующую запись
             byte childType = compReader.ReadByte();
 
 
@@ -518,6 +518,7 @@
             // читаем голову списка
             specFs.Seek(0, SeekOrigin.Begin);
             int head = specReader.ReadInt32();
+            int free = specReader.ReadInt32();
 
             int cur = head;
 
@@ -535,7 +536,6 @@
                 {
                     specFs.Seek(cur + 5, SeekOrigin.Begin);
                     specWriter.Write((short)(count + 1));
-
                     Console.WriteLine("Кратность увеличена");
                     return;
                 }
@@ -544,7 +544,7 @@
             }
 
             // если записи нет → создаём новую
-            specFs.Seek(0, SeekOrigin.End);
+            specFs.Seek(free, SeekOrigin.Begin);
             int newPos = (int)specFs.Position;
 
             specWriter.Write((byte)0);
@@ -570,10 +570,11 @@
             {
                 compFs.Seek(head, SeekOrigin.Begin);
 
-                byte del = compReader.ReadByte();
-                compReader.ReadInt32();
-                int next = compReader.ReadInt32();
-                string cur = new string(compReader.ReadChars(len)).Trim('\0');
+                byte del = compReader.ReadByte(); // бит удаления
+                compReader.ReadInt32(); // указатель на спецификации
+                int next = compReader.ReadInt32(); // указатель на следующую запись
+                compReader.ReadByte(); // бит типа
+                string cur = new string(compReader.ReadChars(len)).Trim('\0'); // область данных
 
                 if (cur == name && del == 0)
                     return head;
