@@ -84,7 +84,7 @@
             }
             else
             {
-                throw new Exception("Неверный формат. Используйте: Create <имя_файла> <длина_записи>");
+                throw new Exception("Неверный формат. Используйте: Create <имя_файла_компонентов>(<длина_записи>[, <имя_файла_спецификаций>])");
             }
         }
 
@@ -124,7 +124,7 @@
                 throw new Exception("Нет параметров.");
 
             if (!args.Contains("(") || !args.Contains(")"))
-                throw new Exception("Неверный формат. Используйте: Input(компонент, тип) или Input(компонент/деталь)");
+                throw new Exception("Неверный формат. Используйте: Input (компонент, тип) или Input (компонент/деталь)");
 
             if (args.Contains("/"))
             {
@@ -176,7 +176,7 @@
         static void HandleInputComponent(string args)
         {
             if (!args.Contains(","))
-                throw new Exception("Нужна запятая. Используйте: Input(компонент, тип)");
+                throw new Exception("Нужна запятая. Используйте: Input (компонент, тип)");
 
             string componentName = args.Substring(
                 args.IndexOf("(") + 1,
@@ -218,7 +218,7 @@
                 throw new Exception("Нет параметров.");
 
             if (!args.Contains("(") || !args.Contains(")"))
-                throw new Exception("Неверный формат. Используйте: Delete(компонент) или Delete(компонент/деталь)");
+                throw new Exception("Неверный формат. Используйте: Delete (компонент) или Delete (компонент/деталь)");
 
             if (args.Contains("/"))
             {
@@ -257,7 +257,7 @@
             else
             {
                 if (!args.Contains("(") || !args.Contains(")"))
-                    throw new Exception("Используйте: Restore(*) или Restore(компонент)");
+                    throw new Exception("Используйте: Restore * или Restore (компонент)");
 
                 string componentName = args.Substring(
                     args.IndexOf("(") + 1,
@@ -285,7 +285,7 @@
             else
             {
                 if (!args.Contains("(") || !args.Contains(")"))
-                    throw new Exception("Используйте: Print(*) или Print(компонент)");
+                    throw new Exception("Используйте: Print * или Print (компонент)");
 
                 string componentName = args.Substring(
                     args.IndexOf("(") + 1,
@@ -533,7 +533,7 @@
                 {
                     specFs.Seek(cur + 5, SeekOrigin.Begin);
                     specWriter.Write((short)(count + 1));
-                    Console.WriteLine("Кратность увеличена");
+                    Console.WriteLine($"Кратность увеличена ({count})");
                     return;
                 }
 
