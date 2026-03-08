@@ -485,10 +485,15 @@
                 Console.WriteLine("Компонент не найден");
                 return;
             }
+            if (parentOffset == childOffset)
+            {
+                Console.WriteLine("Ошибка: Компонент не может ссылаться сам на себя");
+                return;
+            }
             // Проверяем тип родительского компонента
             compFs.Seek(parentOffset, SeekOrigin.Begin);
             compReader.ReadByte(); // Бит удаления
-            compReader.ReadInt32(); // Указатель на спецификации
+            int specHead = compReader.ReadInt32(); // Указатель на спецификации
             compReader.ReadInt32(); // Указатель на следующую запись
             byte parentType = compReader.ReadByte();
 
@@ -499,27 +504,13 @@
             compReader.ReadInt32(); // Указатель на следующую запись
             byte childType = compReader.ReadByte();
 
-
             if ((ComponentType)parentType == ComponentType.Detail)
             {
                 Console.WriteLine("Ошибка: Деталь не может иметь спецификаций");
                 return;
             }
 
-            if (parentOffset == childOffset)
-            {
-                Console.WriteLine("Ошибка: Компонент не может ссылаться сам на себя");
-                return;
-            }
-
-
-            // читаем голову списка
-            specFs.Seek(0, SeekOrigin.Begin);
-            int head = specReader.ReadInt32();
-            int free = specReader.ReadInt32();
-
-            int cur = head;
-
+            int cur = specHead;
             while (cur != -1)
             {
                 specFs.Seek(cur, SeekOrigin.Begin);
@@ -529,7 +520,6 @@
                 short count = specReader.ReadInt16();
                 int next = specReader.ReadInt32();
 
-                // если уже есть такой child → увеличиваем count
                 if (comp == childOffset && del == 0)
                 {
                     specFs.Seek(cur + 5, SeekOrigin.Begin);
@@ -540,20 +530,19 @@
 
                 cur = next;
             }
-
-            // если записи нет → создаём новую
-            specFs.Seek(free, SeekOrigin.Begin);
+            // Если нет, создаём новую запись
+            specFs.Seek(0, SeekOrigin.End);
             int newPos = (int)specFs.Position;
-
             specWriter.Write((byte)0);
             specWriter.Write(childOffset);
             specWriter.Write((short)1);
-            specWriter.Write(head);
+            specWriter.Write(specHead);
+            int free = (int)specFs.Position;
+            specFs.Seek(4, SeekOrigin.Begin);
+            specWriter.Write(free);
 
-            // новая запись становится головой
-            specFs.Seek(0, SeekOrigin.Begin);
-            specWriter.Write(newPos);
-            specWriter.Write(8);
+            compFs.Seek(parentOffset + 1, SeekOrigin.Begin);
+            compWriter.Write(newPos);
 
             Console.WriteLine("Спецификация добавлена");
         }
