@@ -875,6 +875,27 @@
             Console.WriteLine($"Восстановлено записей: {count}");
         }
 
+        static void RestoreSpecChain(int specHead)
+        {
+            int cur = specHead;
+            while (cur != -1)
+            {
+                specFs.Seek(cur, SeekOrigin.Begin);
+                byte del = specReader.ReadByte();
+                specReader.ReadInt32(); // comp
+                specReader.ReadInt16(); // count
+                int next = specReader.ReadInt32();
+
+                if (del == 1)
+                {
+                    specFs.Seek(cur, SeekOrigin.Begin);
+                    specWriter.Write((byte)0);
+                }
+
+                cur = next;
+            }
+        }
+
         static void Restore(string name)
         {
             if (compFs == null)
