@@ -581,30 +581,45 @@
 
         static bool IsComponentReferenced(int componentOffset)
         {
-            // Проверяем, есть ли спецификации, которые ссылаются на этот компонент
-            specFs.Seek(0, SeekOrigin.Begin);
-            int head = specReader.ReadInt32();
-            int cur = head;
+            if (specFs == null) return false;
 
-            while (cur != -1)
+            compFs.Seek(2, SeekOrigin.Begin);
+            short len = compReader.ReadInt16();
+            int head = compReader.ReadInt32();
+
+            // Обходим все (не удалённые) компоненты
+            while (head != -1)
             {
-                specFs.Seek(cur, SeekOrigin.Begin);
+                compFs.Seek(head, SeekOrigin.Begin);
+                byte del = compReader.ReadByte();
+                int specHead = compReader.ReadInt32();
+                int next = compReader.ReadInt32();
+                compReader.ReadByte();  // type
+                compReader.ReadChars(len);
 
-                byte del = specReader.ReadByte();
-                int comp = specReader.ReadInt32();
-                short count = specReader.ReadInt16();
-                int next = specReader.ReadInt32();
-
-                // Если компонент используется в активной спецификации (не удаленной)
-                if (comp == componentOffset && del == 0)
+                if (del == 0 && specHead != -1)
                 {
-                    return true; // Компонент используется
+                    // Обходим цепочку спецификаций этого компонента
+                    int cur = specHead;
+                    while (cur != -1)
+                    {
+                        specFs.Seek(cur, SeekOrigin.Begin);
+                        byte specDel = specReader.ReadByte();
+                        int comp = specReader.ReadInt32();
+                        specReader.ReadInt16(); // count
+                        int specNext = specReader.ReadInt32();
+
+                        if (comp == componentOffset && specDel == 0)
+                            return true;
+
+                        cur = specNext;
+                    }
                 }
 
-                cur = next;
+                head = next;
             }
 
-            return false; // Компонент не используется
+            return false;
         }
 
         static void Print(string name)
