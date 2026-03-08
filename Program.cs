@@ -456,29 +456,23 @@
             compFs.Seek(free, SeekOrigin.Begin);
             int offset = (int)compFs.Position;
 
-            compWriter.Write((byte)0); // бит удаления
-            compWriter.Write(-1); // Указатель на запись файла спецификаций
-            compWriter.Write(head); // Указатель на следующую запись списка изделий
-            compWriter.Write((byte)type); // бит типа (не из методички, своей головой)
+            compWriter.Write((byte)0);    // бит удаления
+            compWriter.Write(-1);         // указатель на спецификации
+            compWriter.Write(head);       // следующая запись (prepend в список)
+            compWriter.Write((byte)type); // тип компонента
 
-            // Область данных
             byte[] data = new byte[maxLen];
             byte[] src = System.Text.Encoding.ASCII.GetBytes(name);
-
-            // вот тут исключение можно предусмотреть
             int len = Math.Min(src.Length, maxLen);
             Array.Copy(src, data, len);
-
-            for (int i = len; i < maxLen; i++)
-                data[i] = (byte)' ';
-
+            for (int i = len; i < maxLen; i++) data[i] = (byte)' ';
             compWriter.Write(data);
 
-            // новый head
+            // Обновляем head
             compFs.Seek(4, SeekOrigin.Begin);
             compWriter.Write(offset);
 
-            // новый free
+            // Обновляем free
             compFs.Seek(8, SeekOrigin.Begin);
             compWriter.Write(offset + 1 + 4 + 4 + 1 + maxLen);
         }
