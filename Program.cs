@@ -938,100 +938,158 @@
         {
             if (compFs == null)
             {
-                Console.WriteLine("Сначала откройте файл");
+                Console.WriteLine("Сначала откройте файл.");
                 return;
             }
 
             compFs.Seek(2, SeekOrigin.Begin);
             short len = compReader.ReadInt16();
             int head = compReader.ReadInt32();
-
             int recordSize = 1 + 4 + 4 + 1 + len;
 
+            // Собираем живые компоненты в порядке их обхода
             Dictionary<int, int> compMap = new();
             List<int> order = new();
 
             int cur = head;
-
             while (cur != -1)
             {
                 compFs.Seek(cur, SeekOrigin.Begin);
-
                 byte del = compReader.ReadByte();
-                int spec = compReader.ReadInt32();
+                compReader.ReadInt32();    // spec
                 int next = compReader.ReadInt32();
                 compReader.ReadByte();
                 compReader.ReadBytes(len);
 
                 if (del == 0)
-                {
                     order.Add(cur);
-                }
 
                 cur = next;
             }
 
-            int newOffset = 28;
-
+            // Вычисляем новые смещения
+            int newOffset = 28; // размер заголовка компонентного файла
             foreach (var oldOffset in order)
             {
                 compMap[oldOffset] = newOffset;
                 newOffset += recordSize;
             }
 
-            string tempComp = currentFile + ".tmp";
+            // Собираем живые спецификации и вычисляем их новые смещения
+            // Читаем все записи из .prs и находим активные
+            specFs.Seek(0, SeekOrigin.Begin);
+            int specListHead = specReader.ReadInt32();
+            int specFree = specReader.ReadInt32();
 
-            using var newFs = new FileStream(tempComp, FileMode.Create);
-            using var bw = new BinaryWriter(newFs);
+            // Нам нужно перестроить .prs: пересканируем все записи файла
+            int specRecordSize = 1 + 4 + 2 + 4; // del + comp + count + next
+            long specFileLen = specFs.Length;
+            Dictionary<int, int> specMap = new();
+            List<int> specOrder = new();
 
-            bw.Write((byte)'P');
-            bw.Write((byte)'S');
-            bw.Write(len);
-
-            int newHead = order.Count > 0 ? compMap[order[0]] : -1;
-
-            bw.Write(newHead);
-            bw.Write(newOffset);
-
-            byte[] specName = new byte[16];
-            compFs.Seek(12, SeekOrigin.Begin);
-            compFs.Read(specName);
-            bw.Write(specName);
-
-            for (int i = 0; i < order.Count; i++)
+            int specOffset = 8; // после заголовка (head+free)
+            while (specOffset < specFileLen)
             {
-                int oldOffset = order[i];
+                specFs.Seek(specOffset, SeekOrigin.Begin);
+                byte del = specReader.ReadByte();
+                int comp = specReader.ReadInt32();
 
-                compFs.Seek(oldOffset, SeekOrigin.Begin);
+                if (del == 0)
+                    specOrder.Add(specOffset);
 
-                byte del = compReader.ReadByte();
-                int spec = compReader.ReadInt32();
-                int next = compReader.ReadInt32();
-                byte type = compReader.ReadByte();
-                byte[] name = compReader.ReadBytes(len);
-
-                int newNext = -1;
-
-                if (next != -1 && compMap.ContainsKey(next))
-                    newNext = compMap[next];
-
-                bw.Write((byte)0);
-                bw.Write(spec);
-                bw.Write(newNext);
-                bw.Write(type);
-                bw.Write(name);
+                specOffset += specRecordSize;
             }
 
-            bw.Flush();
+            int newSpecOffset = 8;
+            foreach (var oldSpecOffset in specOrder)
+            {
+                specMap[oldSpecOffset] = newSpecOffset;
+                newSpecOffset += specRecordSize;
+            }
+
+            // ─── Записываем новый компонентный файл ───
+            string tempComp = currentFile + ".tmp";
+            using (var newFs = new FileStream(tempComp, FileMode.Create))
+            using (var bw = new BinaryWriter(newFs))
+            {
+                bw.Write((byte)'P');
+                bw.Write((byte)'S');
+                bw.Write(len);
+
+                int newHead = order.Count > 0 ? compMap[order[0]] : -1;
+                bw.Write(newHead);
+                bw.Write(newOffset); // новый free
+
+                byte[] specNameBytes = new byte[16];
+                compFs.Seek(12, SeekOrigin.Begin);
+                compFs.Read(specNameBytes);
+                bw.Write(specNameBytes);
+
+                for (int i = 0; i < order.Count; i++)
+                {
+                    int oldOff = order[i];
+                    compFs.Seek(oldOff, SeekOrigin.Begin);
+                    compReader.ReadByte();    // del (был 0)
+                    int oldSpec = compReader.ReadInt32();
+                    compReader.ReadInt32();   // oldNext — не используем, берём из order
+                    byte type = compReader.ReadByte();
+                    byte[] name = compReader.ReadBytes(len);
+
+                    // newNext — следующий живой элемент в списке order (не по старому указателю!)
+                    int newNext = (i + 1 < order.Count) ? compMap[order[i + 1]] : -1;
+                    int newSpec = (oldSpec != -1 && specMap.ContainsKey(oldSpec)) ? specMap[oldSpec] : -1;
+
+                    bw.Write((byte)0);
+                    bw.Write(newSpec);
+                    bw.Write(newNext);
+                    bw.Write(type);
+                    bw.Write(name);
+                }
+
+                bw.Flush();
+            }
+
+            // ─── Записываем новый файл спецификаций ───
+            string tempSpec = specFile + ".tmp";
+            using (var newSfs = new FileStream(tempSpec, FileMode.Create))
+            using (var bw = new BinaryWriter(newSfs))
+            {
+                // head .prs: нет глобального списка обхода, head не используется при нормальной работе,
+                // но сохраняем корректное значение (-1 — нет глобального списка)
+                bw.Write(-1);
+                bw.Write(newSpecOffset);
+
+                foreach (var oldSpecOff in specOrder)
+                {
+                    specFs.Seek(oldSpecOff, SeekOrigin.Begin);
+                    specReader.ReadByte(); // del
+                    int oldComp = specReader.ReadInt32();
+                    short count = specReader.ReadInt16();
+                    int oldNext = specReader.ReadInt32();
+
+                    int newComp = compMap.ContainsKey(oldComp) ? compMap[oldComp] : oldComp;
+                    int newNext = (oldNext != -1 && specMap.ContainsKey(oldNext)) ? specMap[oldNext] : -1;
+
+                    bw.Write((byte)0);
+                    bw.Write(newComp);
+                    bw.Write(count);
+                    bw.Write(newNext);
+                }
+
+                bw.Flush();
+            }
 
             Close();
 
             File.Delete(currentFile);
             File.Move(tempComp, currentFile);
 
+            File.Delete(specFile);
+            File.Move(tempSpec, specFile);
+
             Open(currentFile);
 
-            Console.WriteLine("Физическое удаление компонентов завершено");
+            Console.WriteLine("Физическое удаление завершено.");
         }
 
         static void Close()
