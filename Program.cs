@@ -646,6 +646,10 @@
                         Console.WriteLine("Спецификации:");
                         PrintSpecifications(spec);
                     }
+                    else
+                    {
+                        Console.WriteLine("Спецификации: нет");
+                    }
                     return;
                 }
 
