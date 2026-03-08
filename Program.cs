@@ -282,8 +282,6 @@
                     args.IndexOf("(") + 1,
                     args.IndexOf(")") - args.IndexOf("(") - 1).Trim();
 
-                Console.WriteLine($"Печать: {componentName}");
-
                 Print(componentName);
             }
         }
@@ -600,11 +598,11 @@
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
-                int next = compReader.ReadInt32();
-                int spec = compReader.ReadInt32();
                 byte del = compReader.ReadByte();
+                int spec = compReader.ReadInt32();
+                int next = compReader.ReadInt32();
                 byte type = compReader.ReadByte();
-                string curName = new string(compReader.ReadChars(len)).Trim('\0');
+                string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && del == 0)
                 {
