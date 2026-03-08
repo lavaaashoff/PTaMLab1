@@ -426,18 +426,30 @@
             compFs.Seek(free, SeekOrigin.Begin);
             int offset = (int)compFs.Position;
 
-            compWriter.Write((byte)0); // Бит удаления
+            compWriter.Write((byte)0); // бит удаления
             compWriter.Write(-1); // Указатель на запись файла спецификаций
             compWriter.Write(head); // Указатель на следующую запись списка изделий
-            compWriter.Write((byte)type); // Type
 
-            // ВОТ ТУТ ХУЙ РАЗБЕРЁШЬ ЧЁ СО СТРУКТУРОЙ ФАЙЛА
-            char[] buf = new char[maxLen];
-            name.ToCharArray().CopyTo(buf, 0);
-            compWriter.Write(buf);
+            // Область данных
+            byte[] data = new byte[maxLen];
+            byte[] src = System.Text.Encoding.ASCII.GetBytes(name);
 
+            // вот тут исключение можно предусмотреть
+            int len = Math.Min(src.Length, maxLen);
+            Array.Copy(src, data, len);
+
+            for (int i = len; i < maxLen; i++)
+                data[i] = (byte)' ';
+
+            compWriter.Write(data);
+
+            // новый head
             compFs.Seek(4, SeekOrigin.Begin);
             compWriter.Write(offset);
+
+            // новый free
+            compFs.Seek(8, SeekOrigin.Begin);
+            compWriter.Write(offset + 1 + 4 + 4 + maxLen);
         }
 
         static void InputSpec(string args)
