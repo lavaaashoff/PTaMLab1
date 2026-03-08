@@ -843,7 +843,8 @@
                 return;
             }
 
-            compFs.Seek(1 + 1 + 2, SeekOrigin.Begin);
+            compFs.Seek(2, SeekOrigin.Begin);
+            compReader.ReadInt16(); // maxLen — пропускаем
             int head = compReader.ReadInt32();
 
             int count = 0;
@@ -851,15 +852,20 @@
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
+                byte deleted = compReader.ReadByte();
+                int spec = compReader.ReadInt32();
+                int next = compReader.ReadInt32();
+                compReader.ReadByte(); // type
 
-                byte deleted = compReader.ReadByte(); // Бит удаления
-                compReader.ReadInt32(); // Указатель на запись файла спецификаций
-                int next = compReader.ReadInt32(); // Указатель на следующую запись списка изделий
-                compReader.ReadByte(); // Бит типа
                 if (deleted == 1)
                 {
                     compFs.Seek(head, SeekOrigin.Begin);
                     compWriter.Write((byte)0);
+
+                    // ✅ Восстанавливаем и спецификации компонента
+                    if (spec != -1)
+                        RestoreSpecChain(spec);
+
                     count++;
                 }
 
