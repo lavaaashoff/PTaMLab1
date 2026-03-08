@@ -75,47 +75,58 @@
 
         static void HandleCreate(string args)
         {
-            if (TryParseCreateCommand(args, out string filename, out short maxLength))
+            if (TryParseCreateCommand(args, out string filename, out short maxLength, out string prsFilename))
             {
-                Console.WriteLine($"Имя файла: {filename}");
+                filename = Path.ChangeExtension(filename, ".prd");
+                Console.WriteLine($"Имя файла компонентов: {filename}");
+                Console.WriteLine($"Имя файла спецификаций: {prsFilename}");
                 Console.WriteLine($"Длина записи: {maxLength}");
-                Create(filename, maxLength);
-                Console.WriteLine("Файл успешно создан.");
+                if (Create(filename, prsFilename, maxLength))
+                    Console.WriteLine("Файл успешно создан.");
             }
             else
-            {
+            { 
                 throw new Exception("Неверный формат. Используйте: Create <имя_файла_компонентов>(<длина_записи>[, <имя_файла_спецификаций>])");
             }
         }
 
-        static bool TryParseCreateCommand(string args, out string filename, out short maxLength)
+        static bool TryParseCreateCommand(string args, out string filename, out short maxLength, out string prsFilename)
         {
             filename = null;
+            prsFilename = null;
             maxLength = 0;
 
-            var parts = args?.Split(' ');
-            if (parts?.Length != 2)
-                return false;
+            if (string.IsNullOrWhiteSpace(args)) return false;
 
-            filename = parts[0];
-            return short.TryParse(parts[1], out maxLength);
+            // Ожидаемый формат: <имя_файла>(<максимальная_длина>[, <имя_файла_спецификаций>])
+            var match = System.Text.RegularExpressions.Regex.Match(args.Trim(),
+                @"^(\S+)\((\d+)(?:,\s*(\S+))?\)$");
+
+            if (!match.Success) return false;
+
+            filename = match.Groups[1].Value;
+            if (!short.TryParse(match.Groups[2].Value, out maxLength)) return false;
+
+            // Если имя .prs не указано — генерируем стандартное
+            prsFilename = match.Groups[3].Success
+                ? Path.ChangeExtension(match.Groups[3].Value, ".prs")
+                : Path.ChangeExtension(filename, ".prs");
+
+            return true;
         }
 
         static void HandleOpen(string args)
         {
             if (string.IsNullOrWhiteSpace(args))
                 throw new Exception("Укажите имя файла.");
+            string filename = Path.ChangeExtension(args.Trim(), ".prd");
 
-            string filename = args;
-            if (!File.Exists(filename))
-                throw new FileNotFoundException($"Файл '{filename}' не существует.");
-
-            FileStream fs = Open(filename);
-
-            if (fs == null)
+            if (!Open(filename))
                 throw new Exception($"Не удалось открыть файл '{filename}'.");
 
-            Console.WriteLine($"Файл '{filename}' открыт.");
+            Console.WriteLine($"Файл компонентов: '{currentFile}'");
+            Console.WriteLine($"Файл спецификаций: '{specFile}'");
+            Console.WriteLine("Файлы открыты.");
         }
 
         static void HandleInput(string args)
@@ -395,16 +406,38 @@
                 Console.WriteLine("Компоненты не найдены.");
         }
 
-        static void Create(string filename, short maxLength)
+        static bool Create(string filename, string prsFilename, short maxLength)
         {
-            // файл спецификаций
-            string prs = Path.ChangeExtension(filename, ".prs");
+            // Проверка сигнатуры если файл существует
+            if (File.Exists(filename))
+            {
+                using (var fs = new FileStream(filename, FileMode.Open))
+                using (var br = new BinaryReader(fs))
+                {
+                    if (fs.Length < 2)
+                        throw new Exception("Файл существует, но сигнатура отсутствует или не соответствует заданию.");
 
-            using (var fs = new FileStream(prs, FileMode.Create))
+                    byte b1 = br.ReadByte();
+                    byte b2 = br.ReadByte();
+                    if (b1 != 'P' || b2 != 'S')
+                        throw new Exception("Файл существует, но сигнатура не соответствует заданию.");
+                }
+
+                Console.Write($"Файл '{filename}' уже существует. Перезаписать? (y/n): ");
+                string answer = Console.ReadLine()?.Trim().ToLower();
+                if (answer != "y" && answer != "yes" && answer != "да" && answer != "д")
+                {
+                    Console.WriteLine("Создание файла отменено.");
+                    return false;
+                }
+            }
+
+            // файл спецификаций
+            using (var fs = new FileStream(prsFilename, FileMode.Create))
             using (var bw = new BinaryWriter(fs))
             {
-                bw.Write(-1); // Указатель на логически первую запись
-                bw.Write(8);  // Указатель на свободную область
+                bw.Write(-1);
+                bw.Write(8);
             }
 
             // файл компонентов
@@ -413,38 +446,73 @@
             {
                 bw.Write((byte)'P');
                 bw.Write((byte)'S');
-                bw.Write(maxLength); // Длина записи данных
-                bw.Write(-1); // Указатель на логически первую запись
-                bw.Write(28); // Указатель на свободную область
+                bw.Write(maxLength);
+                bw.Write(-1);
+                bw.Write(28);
 
                 byte[] nameBytes = new byte[16];
-                var src = System.Text.Encoding.ASCII.GetBytes(prs);
+                var src = System.Text.Encoding.ASCII.GetBytes(prsFilename);
                 Array.Copy(src, nameBytes, Math.Min(src.Length, 16));
                 bw.Write(nameBytes);
             }
+
+            return true;
         }
 
-        static FileStream Open(string name)
+        static bool Open(string name)
         {
-            currentFile = name;
-            specFile = Path.ChangeExtension(name, ".prs");
-
-            compFs = new FileStream(name, FileMode.Open, FileAccess.ReadWrite);
-            compReader = new BinaryReader(compFs);
-            compWriter = new BinaryWriter(compFs);
-
-            specFs = new FileStream(specFile, FileMode.Open, FileAccess.ReadWrite);
-            specReader = new BinaryReader(specFs);
-            specWriter = new BinaryWriter(specFs);
-
-            if (compReader.ReadByte() != 'P' || compReader.ReadByte() != 'S')
+            try
             {
-                Console.WriteLine("Ошибка сигнатуры");
-                Close();
-                return null;
-            }
+                compFs = new FileStream(name, FileMode.Open, FileAccess.ReadWrite);
+                compReader = new BinaryReader(compFs);
+                compWriter = new BinaryWriter(compFs);
 
-            return compFs;
+                // Проверка сигнатуры
+                if (compReader.ReadByte() != 'P' || compReader.ReadByte() != 'S')
+                {
+                    Console.WriteLine("Ошибка: сигнатура файла не соответствует заданию.");
+                    Close();
+                    return false;
+                }
+
+                // Читаем заголовок: maxLength, firstRecord, freeArea — пропускаем
+                compReader.ReadInt16(); // maxLength
+                compReader.ReadInt32(); // firstRecord
+                compReader.ReadInt32(); // freeArea
+
+                // Читаем имя файла спецификаций из заголовка (16 байт)
+                byte[] nameBytes = compReader.ReadBytes(16);
+                string prsFromHeader = System.Text.Encoding.ASCII
+                    .GetString(nameBytes)
+                    .TrimEnd('\0');
+
+                if (string.IsNullOrWhiteSpace(prsFromHeader) || !File.Exists(prsFromHeader))
+                {
+                    // Fallback — стандартное имя рядом с .prd
+                    prsFromHeader = Path.ChangeExtension(name, ".prs");
+                    if (!File.Exists(prsFromHeader))
+                    {
+                        Console.WriteLine("Ошибка: файл спецификаций не найден.");
+                        Close();
+                        return false;
+                    }
+                    Console.WriteLine($"Предупреждение: использован файл спецификаций по умолчанию '{prsFromHeader}'.");
+                }
+
+                specFile = prsFromHeader;
+                specFs = new FileStream(specFile, FileMode.Open, FileAccess.ReadWrite);
+                specReader = new BinaryReader(specFs);
+                specWriter = new BinaryWriter(specFs);
+
+                currentFile = name;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка при открытии: {ex.Message}");
+                Close();
+                return false;
+            }
         }
 
         static void Input(string name, ComponentType type)
