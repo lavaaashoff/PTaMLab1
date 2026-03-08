@@ -862,7 +862,6 @@
                     compFs.Seek(head, SeekOrigin.Begin);
                     compWriter.Write((byte)0);
 
-                    // ✅ Восстанавливаем и спецификации компонента
                     if (spec != -1)
                         RestoreSpecChain(spec);
 
@@ -911,25 +910,28 @@
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
-
-                byte deleted = compReader.ReadByte(); // Бит удаления
-                compReader.ReadInt32(); // Указатель на запись файла спецификаций
-                int next = compReader.ReadInt32(); // Указатель на следующую запись списка изделий
-                compReader.ReadByte(); // Бит типа
+                byte deleted = compReader.ReadByte();
+                int spec = compReader.ReadInt32();
+                int next = compReader.ReadInt32();
+                compReader.ReadByte(); // type
                 string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && deleted == 1)
                 {
                     compFs.Seek(head, SeekOrigin.Begin);
                     compWriter.Write((byte)0);
-                    Console.WriteLine("Запись восстановлена");
+
+                    if (spec != -1)
+                        RestoreSpecChain(spec);
+
+                    Console.WriteLine("Запись восстановлена.");
                     return;
                 }
 
                 head = next;
             }
 
-            Console.WriteLine("Удалённая запись не найдена");
+            Console.WriteLine("Удалённая запись не найдена.");
         }
 
         static void Truncate()
