@@ -192,36 +192,22 @@
             if (compFs == null)
                 throw new Exception("Сначала откройте файл (Open).");
 
-            ComponentType type; 
+            ComponentType type;
             if (int.TryParse(componentType, out int typeNumber))
             {
-                if (Enum.IsDefined(typeof(ComponentType), (byte)typeNumber))
-                {
-                    type = (ComponentType)typeNumber;
-                }
-                else
-                {
-                    throw new Exception($"Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
-                }
+                if (!Enum.IsDefined(typeof(ComponentType), (byte)typeNumber))
+                    throw new Exception("Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
+                type = (ComponentType)typeNumber;
             }
-            else
+            else if (!Enum.TryParse<ComponentType>(componentType, ignoreCase: true, out type))
             {
-                if (!Enum.TryParse<ComponentType>(componentType, out type))
-                {
-                    throw new Exception($"Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
-                }
+                throw new Exception("Неверный тип компонента. Используйте: Product, Unit или Detail");
             }
 
-            if (Enum.TryParse<ComponentType>(componentType, true, out type))
-            {
-                Input(componentName, type);
-                Console.WriteLine("Компонент добавлен.");
-            }
-            else
-            {
-                throw new Exception($"Неверный тип компонента. Используйте: Product, Unit или Detail");
-            }
+            Input(componentName, type);
+            Console.WriteLine("Компонент добавлен.");
         }
+
 
         static void HandleDelete(string args)
         {
@@ -669,9 +655,9 @@
             Console.WriteLine("Компонент не найден");
         }
 
-        static void PrintSpecifications(int specHead)
+        static void PrintSpecifications(int head)
         {
-            int cur = specHead;
+            int cur = head;
 
             while (cur != -1)
             {
@@ -684,12 +670,13 @@
 
                 if (del == 0)
                 {
+                    compFs.Seek(2, SeekOrigin.Begin);
+                    int len = compReader.ReadInt16();
                     compFs.Seek(comp, SeekOrigin.Begin);
-                    int nextComp = compReader.ReadInt32();
-                    int specComp = compReader.ReadInt32();
                     byte delComp = compReader.ReadByte();
+                    int specHead = compReader.ReadInt32();
+                    int nextComp = compReader.ReadInt32();
                     byte typeComp = compReader.ReadByte();
-                    short len = compReader.ReadInt16();
                     string name = new string(compReader.ReadChars(len)).Trim('\0');
 
                     Console.WriteLine($"  - {name} ({(ComponentType)typeComp}) x{count}");
@@ -872,79 +859,102 @@
 
         static void Truncate()
         {
-            if (compFs == null || string.IsNullOrEmpty(currentFile))
+            if (compFs == null)
             {
-                Console.WriteLine("Сначала откройте файл (Open).");
+                Console.WriteLine("Сначала откройте файл");
                 return;
             }
-
-            string tempFile = currentFile + ".tmp";
 
             compFs.Seek(2, SeekOrigin.Begin);
             short len = compReader.ReadInt16();
             int head = compReader.ReadInt32();
 
-            using var newFs = new FileStream(tempFile, FileMode.Create);
-            using var newBw = new BinaryWriter(newFs);
+            int recordSize = 1 + 4 + 4 + 1 + len;
 
-            newBw.Write((byte)'P');
-            newBw.Write((byte)'S');
-            newBw.Write(len);
-            newBw.Write(-1); // new head
-            newBw.Write(-1); // free
+            Dictionary<int, int> compMap = new();
+            List<int> order = new();
 
-            int newHead = -1;
-            int newTail = -1;
+            int cur = head;
 
-            while (head != -1)
+            while (cur != -1)
             {
-                compFs.Seek(head, SeekOrigin.Begin);
+                compFs.Seek(cur, SeekOrigin.Begin);
 
-                int next = compReader.ReadInt32();
+                byte del = compReader.ReadByte();
                 int spec = compReader.ReadInt32();
-                byte deleted = compReader.ReadByte();
-                byte type = compReader.ReadByte();
-                char[] name = compReader.ReadChars(len);
+                int next = compReader.ReadInt32();
+                compReader.ReadByte();
+                compReader.ReadBytes(len);
 
-                if (deleted == 0)
+                if (del == 0)
                 {
-                    int pos = (int)newFs.Position;
-
-                    newBw.Write(-1);
-                    newBw.Write(spec);
-                    newBw.Write((byte)0);
-                    newBw.Write(type);
-                    newBw.Write(name);
-
-                    if (newHead == -1)
-                        newHead = pos;
-                    else
-                    {
-                        newFs.Seek(newTail, SeekOrigin.Begin);
-                        newBw.Write(pos);
-                        newFs.Seek(0, SeekOrigin.End);
-                    }
-
-                    newTail = pos;
+                    order.Add(cur);
                 }
 
-                head = next;
+                cur = next;
             }
 
-            newFs.Seek(4, SeekOrigin.Begin);
-            newBw.Write(newHead);
-            newBw.Write((int)newFs.Length);
+            int newOffset = 28;
+
+            foreach (var oldOffset in order)
+            {
+                compMap[oldOffset] = newOffset;
+                newOffset += recordSize;
+            }
+
+            string tempComp = currentFile + ".tmp";
+
+            using var newFs = new FileStream(tempComp, FileMode.Create);
+            using var bw = new BinaryWriter(newFs);
+
+            bw.Write((byte)'P');
+            bw.Write((byte)'S');
+            bw.Write(len);
+
+            int newHead = order.Count > 0 ? compMap[order[0]] : -1;
+
+            bw.Write(newHead);
+            bw.Write(newOffset);
+
+            byte[] specName = new byte[16];
+            compFs.Seek(12, SeekOrigin.Begin);
+            compFs.Read(specName);
+            bw.Write(specName);
+
+            for (int i = 0; i < order.Count; i++)
+            {
+                int oldOffset = order[i];
+
+                compFs.Seek(oldOffset, SeekOrigin.Begin);
+
+                byte del = compReader.ReadByte();
+                int spec = compReader.ReadInt32();
+                int next = compReader.ReadInt32();
+                byte type = compReader.ReadByte();
+                byte[] name = compReader.ReadBytes(len);
+
+                int newNext = -1;
+
+                if (next != -1 && compMap.ContainsKey(next))
+                    newNext = compMap[next];
+
+                bw.Write((byte)0);
+                bw.Write(spec);
+                bw.Write(newNext);
+                bw.Write(type);
+                bw.Write(name);
+            }
+
+            bw.Flush();
 
             Close();
-            newFs?.Close();
-            newBw?.Close();
 
             File.Delete(currentFile);
-            File.Move(tempFile, currentFile);
+            File.Move(tempComp, currentFile);
 
             Open(currentFile);
 
-            Console.WriteLine("Физическое удаление завершено");
+            Console.WriteLine("Физическое удаление компонентов завершено");
         }
 
         static void Close()
