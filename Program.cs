@@ -363,9 +363,9 @@
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
-                int next = compReader.ReadInt32();
-                int spec = compReader.ReadInt32();
                 byte del = compReader.ReadByte();
+                compReader.ReadInt32();
+                int next = compReader.ReadInt32();
                 byte type = compReader.ReadByte();
                 string name = new string(compReader.ReadChars(len)).Trim('\0');
 
@@ -447,6 +447,7 @@
             compWriter.Write((byte)0); // бит удаления
             compWriter.Write(-1); // Указатель на запись файла спецификаций
             compWriter.Write(head); // Указатель на следующую запись списка изделий
+            compWriter.Write((byte)type); // бит типа (не из методички, своей головой)
 
             // Область данных
             byte[] data = new byte[maxLen];
@@ -467,7 +468,7 @@
 
             // новый free
             compFs.Seek(8, SeekOrigin.Begin);
-            compWriter.Write(offset + 1 + 4 + 4 + maxLen);
+            compWriter.Write(offset + 1 + 4 + 4 + 1 + maxLen);
         }
 
         static void InputSpec(string args)
