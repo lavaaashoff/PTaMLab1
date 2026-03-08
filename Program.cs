@@ -1097,10 +1097,16 @@
             compReader?.Close();
             compWriter?.Close();
             compFs?.Close();
+            compFs = null;
+            compReader = null;
+            compWriter = null;
 
             specReader?.Close();
             specWriter?.Close();
             specFs?.Close();
+            specFs = null;
+            specReader = null;
+            specWriter = null;
         }
     }
 }
