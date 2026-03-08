@@ -572,7 +572,7 @@
                 compReader.ReadInt32(); // указатель на спецификации
                 int next = compReader.ReadInt32(); // указатель на следующую запись
                 compReader.ReadByte(); // бит типа
-                string cur = new string(compReader.ReadChars(len)).Trim('\0'); // область данных
+                string cur = new string(compReader.ReadChars(len)).Trim('\0', ' '); // область данных
 
                 if (cur == name && del == 0)
                     return head;
