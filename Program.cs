@@ -540,6 +540,13 @@
             int free = (int)specFs.Position;
             specFs.Seek(4, SeekOrigin.Begin);
             specWriter.Write(free);
+            specFs.Seek(0, SeekOrigin.Begin);
+            int first = (int)specReader.ReadInt32();
+            if (first == -1) // ну вот супер-бесполезное поле, но вот чтоб не было FFFF
+            {
+                specFs.Seek(0, SeekOrigin.Begin);
+                specWriter.Write(8); // по идее будет всегда 8, ток если не удалить
+            }
 
             compFs.Seek(parentOffset + 1, SeekOrigin.Begin);
             compWriter.Write(newPos);
