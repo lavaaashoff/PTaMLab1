@@ -569,10 +569,9 @@
             {
                 compFs.Seek(head, SeekOrigin.Begin);
 
-                int next = compReader.ReadInt32();
-                compReader.ReadInt32();
                 byte del = compReader.ReadByte();
-                compReader.ReadByte();
+                compReader.ReadInt32();
+                int next = compReader.ReadInt32();
                 string cur = new string(compReader.ReadChars(len)).Trim('\0');
 
                 if (cur == name && del == 0)
