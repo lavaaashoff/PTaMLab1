@@ -107,6 +107,9 @@
                 throw new Exception("Укажите имя файла.");
 
             string filename = args;
+            if (!File.Exists(filename))
+                throw new FileNotFoundException($"Файл '{filename}' не существует.");
+
             FileStream fs = Open(filename);
 
             if (fs == null)
@@ -317,7 +320,7 @@
             Console.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
             Console.WriteLine("  Open <имя_файла> - открыть существующий файл");
             Console.WriteLine("  Input(компонент, тип) - добавить компонент");
-            Console.WriteLine("  Типы компонентов (можно указывать словом или цифрой):h");
+            Console.WriteLine("  Типы компонентов (можно указывать словом или цифрой):");
             Console.WriteLine("  Product (1) - изделие");
             Console.WriteLine("  Unit (2)    - узел");
             Console.WriteLine("  Detail (3)  - деталь");
