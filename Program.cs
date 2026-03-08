@@ -579,6 +579,34 @@
             return -1;
         }
 
+        static bool IsComponentReferenced(int componentOffset)
+        {
+            // Проверяем, есть ли спецификации, которые ссылаются на этот компонент
+            specFs.Seek(0, SeekOrigin.Begin);
+            int head = specReader.ReadInt32();
+            int cur = head;
+
+            while (cur != -1)
+            {
+                specFs.Seek(cur, SeekOrigin.Begin);
+
+                byte del = specReader.ReadByte();
+                int comp = specReader.ReadInt32();
+                short count = specReader.ReadInt16();
+                int next = specReader.ReadInt32();
+
+                // Если компонент используется в активной спецификации (не удаленной)
+                if (comp == componentOffset && del == 0)
+                {
+                    return true; // Компонент используется
+                }
+
+                cur = next;
+            }
+
+            return false; // Компонент не используется
+        }
+
         static void Print(string name)
         {
             if (compFs == null)
@@ -666,15 +694,21 @@
             {
                 compFs.Seek(head, SeekOrigin.Begin);
 
+                int delPos = (int)compFs.Position;
+                byte deleted = compReader.ReadByte(); // Бит удаления
+                int spec = compReader.ReadInt32(); // Указатель на спецификации
                 int next = compReader.ReadInt32();
-                compReader.ReadInt32(); // SpecHead
-                long delPos = compFs.Position;
-                byte deleted = compReader.ReadByte();
                 compReader.ReadByte(); // Type
-                string curName = new string(compReader.ReadChars(len)).Trim('\0');
+                string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && deleted == 0)
                 {
+                    // Проверяем, есть ли ссылки на этот компонент в спецификациях
+                    if (IsComponentReferenced(head))
+                    {
+                        throw new Exception($"Невозможно удалить компонент '{name}': на него есть ссылки в спецификациях.");
+                    }
+
                     compFs.Seek(delPos, SeekOrigin.Begin);
                     compWriter.Write((byte)1);
                     Console.WriteLine("Запись помечена как удалённая");
