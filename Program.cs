@@ -192,7 +192,27 @@
             if (compFs == null)
                 throw new Exception("Сначала откройте файл (Open).");
 
-            if (Enum.TryParse<ComponentType>(componentType, true, out ComponentType type))
+            ComponentType type; 
+            if (int.TryParse(componentType, out int typeNumber))
+            {
+                if (Enum.IsDefined(typeof(ComponentType), (byte)typeNumber))
+                {
+                    type = (ComponentType)typeNumber;
+                }
+                else
+                {
+                    throw new Exception($"Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
+                }
+            }
+            else
+            {
+                if (!Enum.TryParse<ComponentType>(componentType, out type))
+                {
+                    throw new Exception($"Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
+                }
+            }
+
+            if (Enum.TryParse<ComponentType>(componentType, true, out type))
             {
                 Input(componentName, type);
                 Console.WriteLine("Компонент добавлен.");
@@ -311,6 +331,10 @@
             Console.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
             Console.WriteLine("  Open <имя_файла> - открыть существующий файл");
             Console.WriteLine("  Input(компонент, тип) - добавить компонент");
+            Console.WriteLine("  Типы компонентов (можно указывать словом или цифрой):h");
+            Console.WriteLine("  Product (1) - изделие");
+            Console.WriteLine("  Unit (2)    - узел");
+            Console.WriteLine("  Detail (3)  - деталь");
             Console.WriteLine("  Input(компонент/деталь) - добавить спецификацию");
             Console.WriteLine("  Delete(компонент) - удалить компонент");
             Console.WriteLine("  Delete(компонент/деталь) - удалить спецификацию");
@@ -331,6 +355,10 @@
                 writer.WriteLine("  Create <имя_файла> <длина_записи> - создать новый файл");
                 writer.WriteLine("  Open <имя_файла> - открыть существующий файл");
                 writer.WriteLine("  Input(компонент, тип) - добавить компонент");
+                writer.WriteLine("      Типы компонентов (можно указывать словом или цифрой):");
+                writer.WriteLine("          Product (1) - изделие");
+                writer.WriteLine("          Unit (2)    - узел");
+                writer.WriteLine("          Detail (3)  - деталь");
                 writer.WriteLine("  Input(компонент/деталь) - добавить спецификацию");
                 writer.WriteLine("  Delete(компонент) - удалить компонент");
                 writer.WriteLine("  Delete(компонент/деталь) - удалить спецификацию");
@@ -540,13 +568,6 @@
             int free = (int)specFs.Position;
             specFs.Seek(4, SeekOrigin.Begin);
             specWriter.Write(free);
-            specFs.Seek(0, SeekOrigin.Begin);
-            int first = (int)specReader.ReadInt32();
-            if (first == -1) // ну вот супер-бесполезное поле, но вот чтоб не было FFFF
-            {
-                specFs.Seek(0, SeekOrigin.Begin);
-                specWriter.Write(8); // по идее будет всегда 8, ток если не удалить
-            }
 
             compFs.Seek(parentOffset + 1, SeekOrigin.Begin);
             compWriter.Write(newPos);
