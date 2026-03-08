@@ -753,8 +753,7 @@
                 return;
             }
 
-            compFs.Seek(2, SeekOrigin.Begin);
-            short len = compReader.ReadInt16();
+            compFs.Seek(1 + 1 + 2, SeekOrigin.Begin);
             int head = compReader.ReadInt32();
 
             int count = 0;
@@ -763,14 +762,13 @@
             {
                 compFs.Seek(head, SeekOrigin.Begin);
 
-                int next = compReader.ReadInt32();
-                compReader.ReadInt32();
-                long delPos = compFs.Position;
-                byte deleted = compReader.ReadByte();
-
+                byte deleted = compReader.ReadByte(); // Бит удаления
+                compReader.ReadInt32(); // Указатель на запись файла спецификаций
+                int next = compReader.ReadInt32(); // Указатель на следующую запись списка изделий
+                compReader.ReadByte(); // Бит типа
                 if (deleted == 1)
                 {
-                    compFs.Seek(delPos, SeekOrigin.Begin);
+                    compFs.Seek(head, SeekOrigin.Begin);
                     compWriter.Write((byte)0);
                     count++;
                 }
@@ -797,16 +795,15 @@
             {
                 compFs.Seek(head, SeekOrigin.Begin);
 
-                int next = compReader.ReadInt32();
-                compReader.ReadInt32();
-                long delPos = compFs.Position;
-                byte deleted = compReader.ReadByte();
-                compReader.ReadByte();
-                string curName = new string(compReader.ReadChars(len)).Trim('\0');
+                byte deleted = compReader.ReadByte(); // Бит удаления
+                compReader.ReadInt32(); // Указатель на запись файла спецификаций
+                int next = compReader.ReadInt32(); // Указатель на следующую запись списка изделий
+                compReader.ReadByte(); // Бит типа
+                string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && deleted == 1)
                 {
-                    compFs.Seek(delPos, SeekOrigin.Begin);
+                    compFs.Seek(head, SeekOrigin.Begin);
                     compWriter.Write((byte)0);
                     Console.WriteLine("Запись восстановлена");
                     return;
