@@ -762,7 +762,6 @@
         {
             var inside = args[(args.IndexOf("(") + 1)..args.IndexOf(")")];
             var split = inside.Split('/');
-
             string parent = split[0].Trim();
             string child = split[1].Trim();
 
@@ -771,20 +770,25 @@
 
             if (parentOffset == -1 || childOffset == -1)
             {
-                Console.WriteLine("Компонент не найден");
+                Console.WriteLine("Компонент не найден.");
                 return;
             }
 
-            // Ищем спецификацию для удаления
-            specFs.Seek(0, SeekOrigin.Begin);
-            int head = specReader.ReadInt32();
-            int cur = head;
+            compFs.Seek(parentOffset + 1, SeekOrigin.Begin); // +1 пропускаем бит удаления
+            int specHead = compReader.ReadInt32();
+
+            if (specHead == -1)
+            {
+                Console.WriteLine("У компонента нет спецификаций.");
+                return;
+            }
+
+            int cur = specHead;
             int prev = -1;
 
             while (cur != -1)
             {
                 specFs.Seek(cur, SeekOrigin.Begin);
-
                 byte del = specReader.ReadByte();
                 int comp = specReader.ReadInt32();
                 short count = specReader.ReadInt16();
@@ -797,15 +801,30 @@
                         // Уменьшаем кратность
                         specFs.Seek(cur + 5, SeekOrigin.Begin);
                         specWriter.Write((short)(count - 1));
-                        Console.WriteLine("Кратность уменьшена");
+                        Console.WriteLine("Кратность уменьшена.");
                     }
                     else
                     {
-                        // Помечаем запись как удаленную
+                        // Помечаем запись удалённой
                         specFs.Seek(cur, SeekOrigin.Begin);
                         specWriter.Write((byte)1);
-                        Console.WriteLine("Спецификация помечена как удалённая");
+
+                        if (prev == -1)
+                        {
+                            // Это первая запись в цепочке — обновляем указатель у родителя
+                            compFs.Seek(parentOffset + 1, SeekOrigin.Begin);
+                            compWriter.Write(next);
+                        }
+                        else
+                        {
+                            // Обновляем поле next предыдущей записи
+                            specFs.Seek(prev + 1 + 4 + 2, SeekOrigin.Begin); // del+comp+count
+                            specWriter.Write(next);
+                        }
+
+                        Console.WriteLine("Спецификация помечена как удалённая.");
                     }
+
                     return;
                 }
 
@@ -813,7 +832,7 @@
                 cur = next;
             }
 
-            Console.WriteLine("Спецификация не найдена");
+            Console.WriteLine("Спецификация не найдена.");
         }
 
         static void RestoreAll()
