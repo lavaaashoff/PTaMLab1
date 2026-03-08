@@ -652,7 +652,7 @@
                     if (spec != -1)
                     {
                         Console.WriteLine("Спецификации:");
-                        PrintSpecifications(spec, len);
+                        PrintSpecifications(spec);
                     }
                     else
                     {
@@ -709,59 +709,39 @@
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
+
                 int delPos = (int)compFs.Position;
-                byte deleted = compReader.ReadByte();
-                int spec = compReader.ReadInt32();
+                byte deleted = compReader.ReadByte(); // Бит удаления
+                int spec = compReader.ReadInt32(); // Указатель на спецификации
                 int next = compReader.ReadInt32();
-                compReader.ReadByte(); // type
+                compReader.ReadByte(); // Type
                 string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && deleted == 0)
                 {
+                    // Проверяем, есть ли ссылки на этот компонент в спецификациях
                     if (IsComponentReferenced(head))
+                    {
                         throw new Exception($"Невозможно удалить компонент '{name}': на него есть ссылки в спецификациях.");
+                    }
 
                     compFs.Seek(delPos, SeekOrigin.Begin);
                     compWriter.Write((byte)1);
-
-                    if (spec != -1)
-                        DeleteSpecChain(spec);
-
-                    Console.WriteLine("Запись помечена как удалённая (вместе со спецификациями).");
+                    Console.WriteLine("Запись помечена как удалённая");
                     return;
                 }
 
                 head = next;
             }
 
-            Console.WriteLine("Компонент не найден.");
-        }
-
-        static void DeleteSpecChain(int specHead)
-        {
-            int cur = specHead;
-            while (cur != -1)
-            {
-                specFs.Seek(cur, SeekOrigin.Begin);
-                byte del = specReader.ReadByte();
-                specReader.ReadInt32(); // comp
-                specReader.ReadInt16(); // count
-                int next = specReader.ReadInt32();
-
-                if (del == 0)
-                {
-                    specFs.Seek(cur, SeekOrigin.Begin);
-                    specWriter.Write((byte)1); // помечаем удалённой
-                }
-
-                cur = next;
-            }
+            Console.WriteLine("Компонент не найден");
         }
 
         static void DeleteSpec(string args)
         {
             var inside = args[(args.IndexOf("(") + 1)..args.IndexOf(")")];
             var split = inside.Split('/');
+
             string parent = split[0].Trim();
             string child = split[1].Trim();
 
@@ -770,26 +750,20 @@
 
             if (parentOffset == -1 || childOffset == -1)
             {
-                Console.WriteLine("Компонент не найден.");
+                Console.WriteLine("Компонент не найден");
                 return;
             }
 
-            // ✅ ИСПРАВЛЕНО: читаем specHead родителя и ищем только в его цепочке
-            compFs.Seek(parentOffset + 1, SeekOrigin.Begin); // +1 пропускаем бит удаления
-            int specHead = compReader.ReadInt32();
-
-            if (specHead == -1)
-            {
-                Console.WriteLine("У компонента нет спецификаций.");
-                return;
-            }
-
-            int cur = specHead;
+            // Ищем спецификацию для удаления
+            specFs.Seek(0, SeekOrigin.Begin);
+            int head = specReader.ReadInt32();
+            int cur = head;
             int prev = -1;
 
             while (cur != -1)
             {
                 specFs.Seek(cur, SeekOrigin.Begin);
+
                 byte del = specReader.ReadByte();
                 int comp = specReader.ReadInt32();
                 short count = specReader.ReadInt16();
@@ -802,31 +776,15 @@
                         // Уменьшаем кратность
                         specFs.Seek(cur + 5, SeekOrigin.Begin);
                         specWriter.Write((short)(count - 1));
-                        Console.WriteLine("Кратность уменьшена.");
+                        Console.WriteLine("Кратность уменьшена");
                     }
                     else
                     {
-                        // Помечаем запись удалённой
+                        // Помечаем запись как удаленную
                         specFs.Seek(cur, SeekOrigin.Begin);
                         specWriter.Write((byte)1);
-
-                        // ✅ Обновляем указатель: предыдущий узел или сам родитель
-                        if (prev == -1)
-                        {
-                            // Это первая запись в цепочке — обновляем указатель у родителя
-                            compFs.Seek(parentOffset + 1, SeekOrigin.Begin);
-                            compWriter.Write(next);
-                        }
-                        else
-                        {
-                            // Обновляем поле next предыдущей записи
-                            specFs.Seek(prev + 1 + 4 + 2, SeekOrigin.Begin); // del+comp+count
-                            specWriter.Write(next);
-                        }
-
-                        Console.WriteLine("Спецификация помечена как удалённая.");
+                        Console.WriteLine("Спецификация помечена как удалённая");
                     }
-
                     return;
                 }
 
@@ -834,7 +792,7 @@
                 cur = next;
             }
 
-            Console.WriteLine("Спецификация не найдена.");
+            Console.WriteLine("Спецификация не найдена");
         }
 
         static void RestoreAll()
