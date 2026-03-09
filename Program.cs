@@ -28,6 +28,8 @@
                     var cmd = Console.ReadLine();
                     if (string.IsNullOrWhiteSpace(cmd)) continue;
 
+
+                    // Разделение команды и аргументов.
                     var parts = cmd.Split(' ', 2);
                     var command = parts[0];
                     var args = parts.Length > 1 ? parts[1] : "";
@@ -73,6 +75,7 @@
             }
         }
 
+
         static void HandleCreate(string args)
         {
             if (TryParseCreateCommand(args, out string filename, out short maxLength, out string prsFilename))
@@ -81,13 +84,9 @@
                 Console.WriteLine($"Имя файла компонентов: {filename}");
                 Console.WriteLine($"Имя файла спецификаций: {prsFilename}");
                 Console.WriteLine($"Длина записи: {maxLength}");
-                if (Create(filename, prsFilename, maxLength))
-                    Console.WriteLine("Файл успешно создан.");
+                if (Create(filename, prsFilename, maxLength)) Console.WriteLine("Файл успешно создан.");
             }
-            else
-            { 
-                throw new Exception("Неверный формат. Используйте: Create <имя_файла_компонентов>(<длина_записи>[, <имя_файла_спецификаций>])");
-            }
+            else throw new Exception("Неверный формат. Используйте: Create <имя_файла_компонентов>(<длина_записи>[, <имя_файла_спецификаций>])");
         }
 
         static bool TryParseCreateCommand(string args, out string filename, out short maxLength, out string prsFilename)
@@ -98,7 +97,7 @@
 
             if (string.IsNullOrWhiteSpace(args)) return false;
 
-            // Ожидаемый формат: <имя_файла>(<максимальная_длина>[, <имя_файла_спецификаций>])
+            // Ожидаемый формат: <имя_файла>(<максимальная_длина>[, <имя_файла_спецификаций>]).
             var match = System.Text.RegularExpressions.Regex.Match(args.Trim(),
                 @"^(\S+)\((\d+)(?:,\s*(\S+))?\)$");
 
@@ -107,7 +106,7 @@
             filename = match.Groups[1].Value;
             if (!short.TryParse(match.Groups[2].Value, out maxLength)) return false;
 
-            // Если имя .prs не указано — генерируем стандартное
+            // Если имя .prs не указано генерируем стандартное.
             prsFilename = match.Groups[3].Success
                 ? Path.ChangeExtension(match.Groups[3].Value, ".prs")
                 : Path.ChangeExtension(filename, ".prs");
@@ -117,12 +116,10 @@
 
         static void HandleOpen(string args)
         {
-            if (string.IsNullOrWhiteSpace(args))
-                throw new Exception("Укажите имя файла.");
+            if (string.IsNullOrWhiteSpace(args)) throw new Exception("Укажите имя файла.");
             string filename = Path.ChangeExtension(args.Trim(), ".prd");
 
-            if (!Open(filename))
-                throw new Exception($"Не удалось открыть файл '{filename}'.");
+            if (!Open(filename)) throw new Exception($"Не удалось открыть файл '{filename}'.");
 
             Console.WriteLine($"Файл компонентов: '{currentFile}'");
             Console.WriteLine($"Файл спецификаций: '{specFile}'");
@@ -169,9 +166,12 @@
                 if (parentOffset != -1)
                 {
                     compFs.Seek(parentOffset, SeekOrigin.Begin);
-                    compReader.ReadByte();  // Бит удаления
-                    compReader.ReadInt32(); // Указатель на спецификации
-                    compReader.ReadInt32(); // Следующая запись
+                    // Бит удаления.
+                    compReader.ReadByte();
+                    // Указатель на спецификации.
+                    compReader.ReadInt32();
+                    // Следующая запись.
+                    compReader.ReadInt32(); 
                     byte parentType = compReader.ReadByte();
 
                     if ((ComponentType)parentType == ComponentType.Detail)
@@ -186,8 +186,7 @@
 
         static void HandleInputComponent(string args)
         {
-            if (!args.Contains(","))
-                throw new Exception("Нужна запятая. Используйте: Input (компонент, тип)");
+            if (!args.Contains(",")) throw new Exception("Нужна запятая. Используйте: Input (компонент, тип)");
 
             string componentName = args.Substring(
                 args.IndexOf("(") + 1,
@@ -197,20 +196,17 @@
                 args.IndexOf(", ") + 2,
                 args.IndexOf(")") - args.IndexOf(", ") - 2).Trim();
 
-            if (string.IsNullOrWhiteSpace(componentName))
-                throw new Exception("Имя компонента не может быть пустым.");
+            if (string.IsNullOrWhiteSpace(componentName)) throw new Exception("Имя компонента не может быть пустым.");
 
             Console.WriteLine($"Компонент: {componentName}");
             Console.WriteLine($"Тип: {componentType}");
 
-            if (compFs == null)
-                throw new Exception("Сначала откройте файл (Open).");
+            if (compFs == null)  throw new Exception("Сначала откройте файл (Open).");
 
             ComponentType type;
             if (int.TryParse(componentType, out int typeNumber))
             {
-                if (!Enum.IsDefined(typeof(ComponentType), (byte)typeNumber))
-                    throw new Exception("Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
+                if (!Enum.IsDefined(typeof(ComponentType), (byte)typeNumber)) throw new Exception("Неверный тип компонента. Допустимые значения: 1 (Product), 2 (Unit), 3 (Detail)");
                 type = (ComponentType)typeNumber;
             }
             else if (!Enum.TryParse<ComponentType>(componentType, ignoreCase: true, out type))
@@ -225,11 +221,9 @@
 
         static void HandleDelete(string args)
         {
-            if (string.IsNullOrWhiteSpace(args))
-                throw new Exception("Нет параметров.");
+            if (string.IsNullOrWhiteSpace(args)) throw new Exception("Нет параметров.");
 
-            if (!args.Contains("(") || !args.Contains(")"))
-                throw new Exception("Неверный формат. Используйте: Delete (компонент) или Delete (компонент/деталь)");
+            if (!args.Contains("(") || !args.Contains(")")) throw new Exception("Неверный формат. Используйте: Delete (компонент) или Delete (компонент/деталь)");
 
             if (args.Contains("/"))
             {
@@ -267,8 +261,7 @@
             }
             else
             {
-                if (!args.Contains("(") || !args.Contains(")"))
-                    throw new Exception("Используйте: Restore * или Restore (компонент)");
+                if (!args.Contains("(") || !args.Contains(")")) throw new Exception("Используйте: Restore * или Restore (компонент)");
 
                 string componentName = args.Substring(
                     args.IndexOf("(") + 1,
@@ -295,8 +288,7 @@
             }
             else
             {
-                if (!args.Contains("(") || !args.Contains(")"))
-                    throw new Exception("Используйте: Print * или Print (компонент)");
+                if (!args.Contains("(") || !args.Contains(")")) throw new Exception("Используйте: Print * или Print (компонент)");
 
                 string componentName = args.Substring(
                     args.IndexOf("(") + 1,
@@ -308,10 +300,7 @@
 
         static void HandleHelp(string args)
         {
-            if (string.IsNullOrWhiteSpace(args))
-            {
-                DisplayHelpToConsole();
-            }
+            if (string.IsNullOrWhiteSpace(args)) DisplayHelpToConsole();
             else
             {
                 SaveHelpToFile(args);
@@ -402,25 +391,22 @@
                 head = next;
             }
 
-            if (!found)
-                Console.WriteLine("Компоненты не найдены.");
+            if (!found) Console.WriteLine("Компоненты не найдены.");
         }
 
         static bool Create(string filename, string prsFilename, short maxLength)
         {
-            // Проверка сигнатуры если файл существует
+            // Проверка сигнатуры если файл существует.
             if (File.Exists(filename))
             {
                 using (var fs = new FileStream(filename, FileMode.Open))
                 using (var br = new BinaryReader(fs))
                 {
-                    if (fs.Length < 2)
-                        throw new Exception("Файл существует, но сигнатура отсутствует или не соответствует заданию.");
+                    if (fs.Length < 2) throw new Exception("Файл существует, но сигнатура отсутствует или не соответствует заданию.");
 
                     byte b1 = br.ReadByte();
                     byte b2 = br.ReadByte();
-                    if (b1 != 'P' || b2 != 'S')
-                        throw new Exception("Файл существует, но сигнатура не соответствует заданию.");
+                    if (b1 != 'P' || b2 != 'S') throw new Exception("Файл существует, но сигнатура не соответствует заданию.");
                 }
 
                 Console.Write($"Файл '{filename}' уже существует. Перезаписать? (y/n): ");
@@ -432,7 +418,7 @@
                 }
             }
 
-            // файл спецификаций
+            // Файл спецификаций.
             using (var fs = new FileStream(prsFilename, FileMode.Create))
             using (var bw = new BinaryWriter(fs))
             {
@@ -440,7 +426,7 @@
                 bw.Write(8);
             }
 
-            // файл компонентов
+            // Файл компонентов.
             using (var fs = new FileStream(filename, FileMode.Create))
             using (var bw = new BinaryWriter(fs))
             {
@@ -467,7 +453,7 @@
                 compReader = new BinaryReader(compFs);
                 compWriter = new BinaryWriter(compFs);
 
-                // Проверка сигнатуры
+                // Проверка сигнатуры.
                 if (compReader.ReadByte() != 'P' || compReader.ReadByte() != 'S')
                 {
                     Console.WriteLine("Ошибка: сигнатура файла не соответствует заданию.");
@@ -475,12 +461,15 @@
                     return false;
                 }
 
-                // Читаем заголовок: maxLength, firstRecord, freeArea — пропускаем
-                compReader.ReadInt16(); // maxLength
-                compReader.ReadInt32(); // firstRecord
-                compReader.ReadInt32(); // freeArea
+                // Читаем заголовок: Максимальную длину, первую запись, свободную область пропускаем.
+                // Максимальная длина.
+                compReader.ReadInt16();
+                // Первая запись.
+                compReader.ReadInt32();
+                // Свободная область.
+                compReader.ReadInt32(); 
 
-                // Читаем имя файла спецификаций из заголовка (16 байт)
+                // Читаем имя файла спецификаций из заголовка (16 байт).
                 byte[] nameBytes = compReader.ReadBytes(16);
                 string prsFromHeader = System.Text.Encoding.ASCII
                     .GetString(nameBytes)
@@ -488,7 +477,7 @@
 
                 if (string.IsNullOrWhiteSpace(prsFromHeader) || !File.Exists(prsFromHeader))
                 {
-                    // Fallback — стандартное имя рядом с .prd
+                    // Стандартное имя рядом с .prd.
                     prsFromHeader = Path.ChangeExtension(name, ".prs");
                     if (!File.Exists(prsFromHeader))
                     {
@@ -525,10 +514,14 @@
             compFs.Seek(free, SeekOrigin.Begin);
             int offset = (int)compFs.Position;
 
-            compWriter.Write((byte)0);    // бит удаления
-            compWriter.Write(-1);         // указатель на спецификации
-            compWriter.Write(head);       // следующая запись (prepend в список)
-            compWriter.Write((byte)type); // тип компонента
+            // Бит удаления.
+            compWriter.Write((byte)0);
+            // Указатель на спецификации.
+            compWriter.Write(-1);
+            // Следующая запись.
+            compWriter.Write(head);
+            // Тип компонента.
+            compWriter.Write((byte)type); 
 
             byte[] data = new byte[maxLen];
             byte[] src = System.Text.Encoding.ASCII.GetBytes(name);
@@ -537,11 +530,11 @@
             for (int i = len; i < maxLen; i++) data[i] = (byte)' ';
             compWriter.Write(data);
 
-            // Обновляем head
+            // Обновляем логически первую запись.
             compFs.Seek(4, SeekOrigin.Begin);
             compWriter.Write(offset);
 
-            // Обновляем free
+            // Обновляем свободную область.
             compFs.Seek(8, SeekOrigin.Begin);
             compWriter.Write(offset + 1 + 4 + 4 + 1 + maxLen);
         }
@@ -567,18 +560,21 @@
                 Console.WriteLine("Ошибка: Компонент не может ссылаться сам на себя");
                 return;
             }
-            // Проверяем тип родительского компонента
+            // Проверяем тип родительского компонента.
             compFs.Seek(parentOffset, SeekOrigin.Begin);
-            compReader.ReadByte(); // Бит удаления
-            int specHead = compReader.ReadInt32(); // Указатель на спецификации
-            compReader.ReadInt32(); // Указатель на следующую запись
+            // Бит удаления.
+            compReader.ReadByte();
+            // Указатель на спецификации.
+            int specHead = compReader.ReadInt32();
+            // Указатель на следующую запись.
+            compReader.ReadInt32(); 
             byte parentType = compReader.ReadByte();
 
-            // Проверяем тип дочернего компонента
+            // Проверяем тип дочернего компонента.
             compFs.Seek(childOffset, SeekOrigin.Begin);
-            compReader.ReadByte(); // Бит удаления
-            compReader.ReadInt32(); // Указатель на спецификации
-            compReader.ReadInt32(); // Указатель на следующую запись
+            compReader.ReadByte(); 
+            compReader.ReadInt32();
+            compReader.ReadInt32();
             byte childType = compReader.ReadByte();
 
             if ((ComponentType)parentType == ComponentType.Detail)
@@ -597,6 +593,7 @@
                 short count = specReader.ReadInt16();
                 int next = specReader.ReadInt32();
 
+                // Если есть такая спецификация, увеличиваем кратность.
                 if (comp == childOffset && del == 0)
                 {
                     specFs.Seek(cur + 5, SeekOrigin.Begin);
@@ -607,7 +604,8 @@
 
                 cur = next;
             }
-            // Если нет, создаём новую запись
+
+            // Если нет, создаём новую запись.
             specFs.Seek(0, SeekOrigin.End);
             int newPos = (int)specFs.Position;
             specWriter.Write((byte)0);
@@ -624,6 +622,7 @@
             Console.WriteLine("Спецификация добавлена");
         }
 
+        // Проверяем наличие компонента по имени и возвращаем его смещение, или -1 если не найден.
         static int FindComponent(string name)
         {
             compFs.Seek(2, SeekOrigin.Begin);
@@ -634,13 +633,14 @@
             {
                 compFs.Seek(head, SeekOrigin.Begin);
                 byte del = compReader.ReadByte();
-                compReader.ReadInt32(); // spec
+                // Указатель на спецификацию
+                compReader.ReadInt32(); 
                 int next = compReader.ReadInt32();
-                compReader.ReadByte(); // type
+                // Тип компонента
+                compReader.ReadByte(); 
                 string cur = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
-                if (cur == name && del == 0)
-                    return head;
+                if (cur == name && del == 0) return head;
 
                 head = next;
             }
@@ -648,6 +648,7 @@
             return -1;
         }
 
+        // Проверяем, есть ли ссылки на компонент в спецификациях.
         static bool IsComponentReferenced(int componentOffset)
         {
             if (specFs == null) return false;
@@ -656,26 +657,28 @@
             short len = compReader.ReadInt16();
             int head = compReader.ReadInt32();
 
-            // Обходим все (не удалённые) компоненты
+            // Обходим все (не удалённые) компоненты.
             while (head != -1)
             {
                 compFs.Seek(head, SeekOrigin.Begin);
                 byte del = compReader.ReadByte();
                 int specHead = compReader.ReadInt32();
                 int next = compReader.ReadInt32();
-                compReader.ReadByte();  // type
+                // Тип компонента.
+                compReader.ReadByte();
                 compReader.ReadChars(len);
 
                 if (del == 0 && specHead != -1)
                 {
-                    // Обходим цепочку спецификаций этого компонента
+                    // Обходим цепочку спецификаций этого компонента.
                     int cur = specHead;
                     while (cur != -1)
                     {
                         specFs.Seek(cur, SeekOrigin.Begin);
                         byte specDel = specReader.ReadByte();
                         int comp = specReader.ReadInt32();
-                        specReader.ReadInt16(); // count
+                        // Кратность.
+                        specReader.ReadInt16();
                         int specNext = specReader.ReadInt32();
 
                         if (comp == componentOffset && specDel == 0)
@@ -717,7 +720,7 @@
                     Console.WriteLine($"Компонент: {curName}");
                     Console.WriteLine($"Тип: {(ComponentType)type}");
 
-                    // Вывод спецификаций
+                    // Вывод спецификаций.
                     if (spec != -1)
                     {
                         Console.WriteLine("Спецификации:");
@@ -750,9 +753,10 @@
                 if (del == 0)
                 {
                     compFs.Seek(comp, SeekOrigin.Begin);
-                    compReader.ReadByte();    // del
-                    compReader.ReadInt32();   // spec
-                    compReader.ReadInt32();   // next
+                    // Пропускаем бит удаления, указатель на спецификацию, указатель на следующую запись.
+                    compReader.ReadByte();
+                    compReader.ReadInt32();   
+                    compReader.ReadInt32();  
                     byte typeComp = compReader.ReadByte();
                     string name = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
@@ -782,19 +786,17 @@
                 byte deleted = compReader.ReadByte();
                 int spec = compReader.ReadInt32();
                 int next = compReader.ReadInt32();
-                compReader.ReadByte(); // type
+                compReader.ReadByte();
                 string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && deleted == 0)
                 {
-                    if (IsComponentReferenced(head))
-                        throw new Exception($"Невозможно удалить компонент '{name}': на него есть ссылки в спецификациях.");
+                    if (IsComponentReferenced(head)) throw new Exception($"Невозможно удалить компонент '{name}': на него есть ссылки в спецификациях.");
 
                     compFs.Seek(delPos, SeekOrigin.Begin);
                     compWriter.Write((byte)1);
 
-                    if (spec != -1)
-                        DeleteSpecChain(spec);
+                    if (spec != -1) DeleteSpecChain(spec);
 
                     Console.WriteLine("Запись помечена как удалённая (вместе со спецификациями).");
                     return;
@@ -813,14 +815,16 @@
             {
                 specFs.Seek(cur, SeekOrigin.Begin);
                 byte del = specReader.ReadByte();
-                specReader.ReadInt32(); // comp
-                specReader.ReadInt16(); // count
+                // Пропускаем компонент и кратность.
+                specReader.ReadInt32();
+                specReader.ReadInt16();
                 int next = specReader.ReadInt32();
 
                 if (del == 0)
                 {
                     specFs.Seek(cur, SeekOrigin.Begin);
-                    specWriter.Write((byte)1); // помечаем удалённой
+                    // Помечаем запись удалённой.
+                    specWriter.Write((byte)1); 
                 }
 
                 cur = next;
@@ -842,8 +846,9 @@
                 Console.WriteLine("Компонент не найден.");
                 return;
             }
-
-            compFs.Seek(parentOffset + 1, SeekOrigin.Begin); // +1 пропускаем бит удаления
+            
+            // Пропускаем бит удаления.
+            compFs.Seek(parentOffset + 1, SeekOrigin.Begin); 
             int specHead = compReader.ReadInt32();
 
             if (specHead == -1)
@@ -867,27 +872,28 @@
                 {
                     if (count > 1)
                     {
-                        // Уменьшаем кратность
+                        // Уменьшаем кратность.
                         specFs.Seek(cur + 5, SeekOrigin.Begin);
                         specWriter.Write((short)(count - 1));
                         Console.WriteLine("Кратность уменьшена.");
                     }
                     else
                     {
-                        // Помечаем запись удалённой
+                        // Помечаем запись удалённой.
                         specFs.Seek(cur, SeekOrigin.Begin);
                         specWriter.Write((byte)1);
 
                         if (prev == -1)
                         {
-                            // Это первая запись в цепочке — обновляем указатель у родителя
+                            // Это первая запись в цепочке — обновляем указатель у родителя.
                             compFs.Seek(parentOffset + 1, SeekOrigin.Begin);
                             compWriter.Write(next);
                         }
                         else
                         {
-                            // Обновляем поле next предыдущей записи
-                            specFs.Seek(prev + 1 + 4 + 2, SeekOrigin.Begin); // del+comp+count
+                            // Обновляем поле next предыдущей записи.
+                            // Бит удаления + компонент + кратность
+                            specFs.Seek(prev + 1 + 4 + 2, SeekOrigin.Begin); 
                             specWriter.Write(next);
                         }
 
@@ -913,7 +919,8 @@
             }
 
             compFs.Seek(2, SeekOrigin.Begin);
-            compReader.ReadInt16(); // maxLen — пропускаем
+            // Максимульную длину пропускаем.
+            compReader.ReadInt16(); 
             int head = compReader.ReadInt32();
 
             int count = 0;
@@ -924,7 +931,8 @@
                 byte deleted = compReader.ReadByte();
                 int spec = compReader.ReadInt32();
                 int next = compReader.ReadInt32();
-                compReader.ReadByte(); // type
+                // Тип компонента.
+                compReader.ReadByte();
 
                 if (deleted == 1)
                 {
@@ -950,8 +958,9 @@
             {
                 specFs.Seek(cur, SeekOrigin.Begin);
                 byte del = specReader.ReadByte();
-                specReader.ReadInt32(); // comp
-                specReader.ReadInt16(); // count
+                // Пропускаем компонент и кратность.
+                specReader.ReadInt32(); 
+                specReader.ReadInt16(); 
                 int next = specReader.ReadInt32();
 
                 if (del == 1)
@@ -982,7 +991,7 @@
                 byte deleted = compReader.ReadByte();
                 int spec = compReader.ReadInt32();
                 int next = compReader.ReadInt32();
-                compReader.ReadByte(); // type
+                compReader.ReadByte();
                 string curName = new string(compReader.ReadChars(len)).Trim('\0', ' ');
 
                 if (curName == name && deleted == 1)
@@ -1016,7 +1025,7 @@
             int head = compReader.ReadInt32();
             int recordSize = 1 + 4 + 4 + 1 + len;
 
-            // Собираем живые компоненты в порядке их обхода
+            // Собираем живые компоненты в порядке их обхода.
             Dictionary<int, int> compMap = new();
             List<int> order = new();
 
@@ -1025,7 +1034,7 @@
             {
                 compFs.Seek(cur, SeekOrigin.Begin);
                 byte del = compReader.ReadByte();
-                compReader.ReadInt32();    // spec
+                compReader.ReadInt32();
                 int next = compReader.ReadInt32();
                 compReader.ReadByte();
                 compReader.ReadBytes(len);
@@ -1036,27 +1045,30 @@
                 cur = next;
             }
 
-            // Вычисляем новые смещения
-            int newOffset = 28; // размер заголовка компонентного файла
+            // Вычисляем новые смещения.
+            // размер заголовка компонентного файла.
+            int newOffset = 28; 
             foreach (var oldOffset in order)
             {
                 compMap[oldOffset] = newOffset;
                 newOffset += recordSize;
             }
 
-            // Собираем живые спецификации и вычисляем их новые смещения
-            // Читаем все записи из .prs и находим активные
+            // Собираем живые спецификации и вычисляем их новые смещения.
+            // Читаем все записи из .prs и находим активные.
             specFs.Seek(0, SeekOrigin.Begin);
             int specListHead = specReader.ReadInt32();
             int specFree = specReader.ReadInt32();
 
-            // Нам нужно перестроить .prs: пересканируем все записи файла
-            int specRecordSize = 1 + 4 + 2 + 4; // del + comp + count + next
+            // Нам нужно перестроить .prs: пересканируем все записи файла.
+            // Бит удаления + указатель на компонент + кратность + указатель на следующую запись.
+            int specRecordSize = 1 + 4 + 2 + 4;
             long specFileLen = specFs.Length;
             Dictionary<int, int> specMap = new();
             List<int> specOrder = new();
 
-            int specOffset = 8; // после заголовка (head+free)
+            // После заголовка.
+            int specOffset = 8; 
             while (specOffset < specFileLen)
             {
                 specFs.Seek(specOffset, SeekOrigin.Begin);
@@ -1076,7 +1088,7 @@
                 newSpecOffset += specRecordSize;
             }
 
-            // ─── Записываем новый компонентный файл ───
+            // Записываем новый компонентный файл.
             string tempComp = currentFile + ".tmp";
             using (var newFs = new FileStream(tempComp, FileMode.Create))
             using (var bw = new BinaryWriter(newFs))
@@ -1087,7 +1099,7 @@
 
                 int newHead = order.Count > 0 ? compMap[order[0]] : -1;
                 bw.Write(newHead);
-                bw.Write(newOffset); // новый free
+                bw.Write(newOffset); 
 
                 byte[] specNameBytes = new byte[16];
                 compFs.Seek(12, SeekOrigin.Begin);
@@ -1098,13 +1110,13 @@
                 {
                     int oldOff = order[i];
                     compFs.Seek(oldOff, SeekOrigin.Begin);
-                    compReader.ReadByte();    // del (был 0)
+                    compReader.ReadByte(); 
                     int oldSpec = compReader.ReadInt32();
-                    compReader.ReadInt32();   // oldNext — не используем, берём из order
+                    compReader.ReadInt32();
                     byte type = compReader.ReadByte();
                     byte[] name = compReader.ReadBytes(len);
 
-                    // newNext — следующий живой элемент в списке order (не по старому указателю!)
+                    // Следующий живой элемент в списке order.
                     int newNext = (i + 1 < order.Count) ? compMap[order[i + 1]] : -1;
                     int newSpec = (oldSpec != -1 && specMap.ContainsKey(oldSpec)) ? specMap[oldSpec] : -1;
 
@@ -1118,13 +1130,13 @@
                 bw.Flush();
             }
 
-            // ─── Записываем новый файл спецификаций ───
+            // Записываем новый файл спецификаций.
             string tempSpec = specFile + ".tmp";
             using (var newSfs = new FileStream(tempSpec, FileMode.Create))
             using (var bw = new BinaryWriter(newSfs))
             {
-                // head .prs: нет глобального списка обхода, head не используется при нормальной работе,
-                // но сохраняем корректное значение (-1 — нет глобального списка)
+                // Нет глобального списка обхода, head не используется при нормальной работе.
+                // Но сохраняем корректное значение (-1 — нет глобального списка).
                 bw.Write(-1);
                 bw.Write(newSpecOffset);
 
