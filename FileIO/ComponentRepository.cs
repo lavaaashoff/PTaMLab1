@@ -122,7 +122,15 @@ namespace PSConsole.FileIO
             _ctx.CompReader.ReadByte();
             _ctx.CompReader.ReadInt32();
             _ctx.CompReader.ReadInt32();
-            // byte childType = _ctx.CompReader.ReadByte(); // зарезервировано
+            byte childType = _ctx.CompReader.ReadByte();
+
+            // Правила допустимых вхождений:
+            // Product может содержать Unit и Detail.
+            // Unit может содержать Unit и Detail.
+            if ((ComponentType)parentType == ComponentType.Unit
+                && (ComponentType)childType == ComponentType.Product)
+                throw new Exception(
+                    $"Узел (Unit) не может содержать изделия (Product).");
 
             // Ищем существующую запись.
             int cur = specHead;
@@ -392,6 +400,7 @@ namespace PSConsole.FileIO
             if (!found) Console.WriteLine("Компоненты не найдены.");
         }
 
+        /// <summary>Выводит компонент и его спецификации рекурсивно в виде дерева.</summary>
         public void Print(string name)
         {
             var (len, head) = _ctx.ReadHeader();
@@ -408,19 +417,8 @@ namespace PSConsole.FileIO
 
                 if (curName == name && del == 0)
                 {
-                    Console.WriteLine($"Компонент: {curName}");
-                    Console.WriteLine($"Тип: {(ComponentType)type}");
-
-                    if (spec != -1)
-                    {
-                        Console.WriteLine("Спецификации:");
-                        PrintSpecifications(spec, len);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Спецификации: нет");
-                    }
-
+                    Console.WriteLine($"{curName} ({(ComponentType)type})");
+                    PrintSpecTree(spec, len, prefix: "", visited: new HashSet<int> { cur });
                     return;
                 }
 
@@ -430,9 +428,18 @@ namespace PSConsole.FileIO
             Console.WriteLine("Компонент не найден.");
         }
 
-        private void PrintSpecifications(int head, int len)
+        /// <summary>
+        /// Рекурсивно выводит дерево спецификаций.
+        /// prefix  — строка отступа текущего уровня ("|   " или "    ").
+        /// visited — защита от циклических ссылок.
+        /// </summary>
+        private void PrintSpecTree(int specHead, int len, string prefix, HashSet<int> visited)
         {
-            int cur = head;
+            if (specHead == -1) return;
+
+            // Собираем живые узлы этого уровня, чтобы знать, последний ли элемент.
+            var items = new List<(int compOffset, short count)>();
+            int cur = specHead;
             while (cur != -1)
             {
                 _ctx.SpecFs.Seek(cur, SeekOrigin.Begin);
@@ -441,19 +448,43 @@ namespace PSConsole.FileIO
                 short count = _ctx.SpecReader.ReadInt16();
                 int next = _ctx.SpecReader.ReadInt32();
 
-                if (del == 0)
-                {
-                    _ctx.CompFs.Seek(comp, SeekOrigin.Begin);
-                    _ctx.CompReader.ReadByte();
-                    _ctx.CompReader.ReadInt32();
-                    _ctx.CompReader.ReadInt32();
-                    byte typeComp = _ctx.CompReader.ReadByte();
-                    string compName = new string(_ctx.CompReader.ReadChars(len)).Trim('\0', ' ');
-
-                    Console.WriteLine($"  - {compName} ({(ComponentType)typeComp}) x{count}");
-                }
-
+                if (del == 0) items.Add((comp, count));
                 cur = next;
+            }
+
+            for (int i = 0; i < items.Count; i++)
+            {
+                var (compOffset, count) = items[i];
+                bool isLast = (i == items.Count - 1);
+
+                // Читаем данные дочернего компонента.
+                _ctx.CompFs.Seek(compOffset, SeekOrigin.Begin);
+                _ctx.CompReader.ReadByte();   // del
+                int childSpec = _ctx.CompReader.ReadInt32();
+                _ctx.CompReader.ReadInt32();   // next
+                byte childType = _ctx.CompReader.ReadByte();
+                string childName = new string(_ctx.CompReader.ReadChars(len)).Trim('\0', ' ');
+
+                string countSuffix = count > 1 ? $" x{count}" : "";
+
+                // Строка-разделитель перед каждым узлом.
+                Console.WriteLine(prefix + "|");
+
+                // Сам узел.
+                Console.WriteLine($"{prefix}{childName} ({(ComponentType)childType}){countSuffix}");
+
+                // Рекурсия только для не-деталей и без цикла.
+                if ((ComponentType)childType != ComponentType.Detail
+                    && childSpec != -1
+                    && !visited.Contains(compOffset))
+                {
+                    visited.Add(compOffset);
+                    // Если текущий элемент последний — следующий уровень отступает пробелами,
+                    // иначе — вертикальной чертой.
+                    string childPrefix = prefix + (isLast ? "    " : "|   ");
+                    PrintSpecTree(childSpec, len, childPrefix, visited);
+                    visited.Remove(compOffset);
+                }
             }
         }
     }
