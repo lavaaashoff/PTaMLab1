@@ -390,7 +390,7 @@ namespace PSConsole.FileIO
 
                 if (del == 0)
                 {
-                    Console.WriteLine($"{name,-20} {(ComponentType)type}");
+                    Console.WriteLine($"{name,-20}");
                     found = true;
                 }
 
@@ -471,7 +471,7 @@ namespace PSConsole.FileIO
                 Console.WriteLine(prefix + "|");
 
                 // Сам узел.
-                Console.WriteLine($"{prefix}{childName} ({(ComponentType)childType}){countSuffix}");
+                Console.WriteLine($"{prefix}{childName} {countSuffix}");
 
                 // Рекурсия только для не-деталей и без цикла.
                 if ((ComponentType)childType != ComponentType.Detail
